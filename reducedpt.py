@@ -2,6 +2,9 @@
 Optimiser based approach to chemical equilibrium
  - Solve pt problem for a simple set of species
 
+ References:
+  - nasacea_I
+
 @author: Nick Gibbons
 """
 from lewis_thermo import get_species
@@ -20,52 +23,67 @@ def Assemble_Matrices(a, bi0, G0_RTs, p, ns, n):
      - n      : Current guess for mixture n
 
     Output: 
-     - A : Jacobian Matrix (nsp+nel+1, nsp+nel+1)
-     - B : RHS Matrix (nsp+nel+1)
+     - A : Jacobian Matrix (nel+1, nel+1)
+     - B : RHS Matrix (nel+1)
     """
-
     nsp= len(ns)
     nel= len(bi0)
-    neq = nsp + nel + 1
+    neq = nel + 1
     A = zeros((neq,neq))
     B = zeros((neq))
+
     lnns = log(ns)
     lnn = log(n)
     lnp = log(p/1e5) # Because the standard pressure was one bar
+    mus_RT = G0_RTs + lnns - lnn + lnp
+    b = (a*ns).sum(axis=1)
 
-    # Gibbs Free Energy Equations
-    for s in range(nsp):
-        A[s,s] = 1.0
-        A[s,nsp] = -1.0
-        for j in range(nel):
-            A[s,nsp+1+j] = a[j,s]
-        B[s] = -(G0_RTs[s] + lnns[s] - lnn + lnp) #-mu/RT (I think...)
+    # Equation 2.24 
+    for k in range(nel):
+        A[k,0] = b[k]
+        for i in range(nel):
+            akjaijnj = 0.0
+            for j in range(nsp):
+                akjaijnj+= a[k,j]*a[i,j]*ns[j]
+            A[k,1+i] = akjaijnj
 
-    # Total n equation
-    for r in range(nsp):
-        A[nsp,r] = ns[r]
-    A[nsp,nsp] = -n
-    B[nsp] = n - ns.sum()
+        akjnjmuj = 0.0
+        for j in range(nsp):
+            akjnjmuj += a[k,j]*ns[j]*mus_RT[j]
+        B[k] = bi0[k] - b[k] + akjnjmuj 
 
-    # Lagrange multiplier constraint equations
+    # Equation (2,26)
+    A[nel,0] = ns.sum() - n
     for i in range(nel):
-        for r in range(nsp):
-            A[nsp+1+i,r] = a[i,r]*ns[r]
-        B[nsp+1+i] = -(a[i,:]*ns).sum() + bi0[i]
+        A[nel,1+i] = b[i]
+    B[nel] = n - ns.sum() + (ns*mus_RT).sum()
+    print(A)
+
     return A,B
 
-def update_unknowns(corrections, ns, n):
+def get_dlnns(corrections, a , bi0, G0_RTs, p, n, ns):
+    """ Compute dln(ns) from equation 2.18 and the reduced system corrections """
+    nel,nsp = a.shape 
+    dlnn = corrections[0]
+    pii = corrections[1:]
+
+    mus_RT = G0_RTs + log(ns) - log(n)+ log(p/1e5) # redundant log calcs here fixme
+    aijpii = zeros(nsp) 
+    for i in range(nel): aijpii += a[i,:]*pii[i]
+
+    dlnns = -mus_RT + dlnn + aijpii
+    return dlnns
+
+def update_unknowns(corrections, dlnns, ns, n):
     # unpack corrections and rescale
-    nsp= len(ns)
-    dlnns = corrections[:nsp]
-    dlnn = corrections[nsp]
-    pii = corrections[nsp+1:]
+    dlnn = corrections[0]
+    pii = corrections[1:]
 
     ns_new = exp(log(ns) + dlnns)
     n_new = exp(log(n) + dlnn)
     return ns_new, n_new, pii
 
-def pteq(spnames, p, T, Xs0,tol=1e-6):
+def pteq_reduced(spnames, p, T, Xs0,tol=1e-6):
     species = [get_species(sp) for sp in spnames]
     elements = set()
     for s in species:
@@ -96,9 +114,11 @@ def pteq(spnames, p, T, Xs0,tol=1e-6):
     for k in range(20):
         A,B = Assemble_Matrices(a, bi0, G0_RTs, p, ns, n)
         corrections = solve(A,B)
-        error = corrections[:nsp+1]
+        dlnns = get_dlnns(corrections, a , bi0, G0_RTs, p, n, ns)
+        error = dlnns
         errorL2 = ((error.dot(error)).sum())**0.5
-        ns, n, pii = update_unknowns(corrections, ns, n)
+        print(dlnns, errorL2,'\n')
+        ns, n, pii = update_unknowns(corrections, dlnns, ns, n)
 
         if errorL2<tol: break
     else:
@@ -132,7 +152,7 @@ if __name__=='__main__':
     print("nt"  , nt)
     print("nt2"  , nt2)
 
-    ns, n = pteq(spnames, p, T, Xs0)
+    ns, n = pteq_reduced(spnames, p, T, Xs0)
     M1 = 1.0/n
     Xs1 = M1*ns
     print("result", Xs1)

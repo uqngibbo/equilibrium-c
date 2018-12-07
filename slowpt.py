@@ -52,6 +52,8 @@ def Assemble_Matrices(a, bi0, G0_RTs, p, ns, n):
         for r in range(nsp):
             A[nsp+1+i,r] = a[i,r]*ns[r]
         B[nsp+1+i] = -(a[i,:]*ns).sum() + bi0[i]
+    print(A)
+    raise Exception
     return A,B
 
 def update_unknowns(corrections, ns, n):
@@ -107,7 +109,6 @@ def pteq(spnames, p, T, Xs0,tol=1e-6):
         raise Exception
 
     return ns, n
-
 
 if __name__=='__main__':
     spnames = ['CO2', 'CO', 'O2']
