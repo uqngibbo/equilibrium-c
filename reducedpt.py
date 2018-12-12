@@ -108,7 +108,7 @@ def pteq_reduced(spnames, p, T, Xs0,tol=1e-6):
     n  = 1.1*ns.sum() 
     pii = zeros(bi0.shape)
 
-    Ru = 8.3144598 # uses gram-moles, or regular moles... to match M in lewis_thermo 
+    Ru = 8.3144598 # uses gram-moles, or regular moles... to match M in lewis_library
     G0_RTs = [s.H0onRT(T) - s.S0onR(T) for s in species]
 
     for k in range(20):

@@ -7,6 +7,7 @@ C library for equilibrium chemistry calculations: linalg module
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
+#include "linalg.h"
 
 void solve_matrix(double* A, double* B, double *X, int N){
     /*
