@@ -9,6 +9,8 @@ C library for equilibrium chemistry calculations: thermo module
 #include <stdlib.h>
 #include "thermo.h"
 
+const double Ru=8.3144621;      // Universal Gas Constant (J/mol/K)
+
 double compute_H0_RT(double Tin, double* lewis){
     /*
     Molar enthalpy at 1 BAR divided by Ru*T for a species using the nasa lewis therodynamic data
@@ -87,8 +89,9 @@ void test_thermo(){
     
 }
 
-
+#ifdef TEST
 int main(){
     test_thermo();
     return 0;
 }
+#endif

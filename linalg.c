@@ -11,7 +11,7 @@ C library for equilibrium chemistry calculations: linalg module
 
 void solve_matrix(double* A, double* B, double *X, int N){
     /*
-    Bare bones Gaussian matrix solution A*X = B 
+    Bare bones Gaussian matrix solver for A*X = B 
        A : pointer to NxN matrix of doubles
        B : pointer to N vector of doubles
        X : pointer to N solution vector of doubles
@@ -97,7 +97,9 @@ void test_solve_matrix(){
     return;
 }
 
+#ifdef TEST
 int main(){
     test_solve_matrix();
     return 0;
 }
+#endif
