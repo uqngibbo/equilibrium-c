@@ -11,6 +11,31 @@ C library for equilibrium chemistry calculations: thermo module
 
 const double Ru=8.3144621;      // Universal Gas Constant (J/mol/K)
 
+double compute_Cp0_R(double Tin, double* lewis){
+    /*
+    Molar Specific Heat at constant Pressure at 1 BAR divided by Ru*T for a species using
+    the nasa lewis therodynamic data
+     Tin   : Temperature (double)
+     lewis : thermo data for current species (double)[3*9] 
+    */
+    double* lp;
+    double Cp0_R,T;
+    int iT;
+
+    T = fmax(fmin(Tin,20000.0),200.0);
+    iT = T <= 1000.0 ? 0 : (T<=6000 ? 1 : 2);
+    lp = lewis + iT*9;
+
+    Cp0_R =  lp[0]/T/T
+           + lp[1]/T
+           + lp[2]
+           + lp[3]*T
+           + lp[4]*T*T
+           + lp[5]*T*T*T
+           + lp[6]*T*T*T*T;
+      return Cp0_R;
+}
+
 double compute_H0_RT(double Tin, double* lewis){
     /*
     Molar enthalpy at 1 BAR divided by Ru*T for a species using the nasa lewis therodynamic data

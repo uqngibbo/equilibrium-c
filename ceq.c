@@ -65,11 +65,18 @@ void pt_Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,double* 
     }
     A[nel*neq + 0]  = nss - n;
     B[nel] = n - nss + nsmus;
+
+    //for (i=0; i<neq; i++){
+    //    for (j=0; j<neq; j++){
+    //        printf("%f ", A[i*neq+j]);
+    //    }
+    //    printf("| %f\n", B[i]);
+    //}
     return;
 }
 
 void species_corrections(double* S,double* a,double* G0_RTs,double p,double n,double* ns,
-                        int nel, int nsp, double* dlnns){
+                        int nsp, int nel, double* dlnns){
     /*
     Compute delta_log(ns) from the reduced iteration equations from 
     equation 2.18m using the other deltas in S
@@ -80,13 +87,13 @@ void species_corrections(double* S,double* a,double* G0_RTs,double p,double n,do
         p      : pressure 
         n      : total moles/mixture kg 
         ns     : species moles/mixture kg [nsp]
-        nel    : total  number of elements 
         nsp    : total number of species
+        nel    : total  number of elements 
 
     Outputs:
         dllns : change in log(ns) [nsp]
     */
-    double dlnn,aijpii,mu_RTs,lnn,lnp;
+    double dlnn,aispii,mu_RTs,lnn,lnp;
     int s,i;
     dlnn = S[0];
     lnn = log(n);
@@ -95,11 +102,11 @@ void species_corrections(double* S,double* a,double* G0_RTs,double p,double n,do
     for (s=0; s<nsp; s++) {
         mu_RTs = G0_RTs[s] + log(ns[s]) - lnn + lnp;
 
-        aijpii = 0.0;
+        aispii = 0.0;
         for (i=0; i<nel; i++){
-            aijpii += a[i*nsp+s]*S[i+1]; // S[i+1] = pi_i, the lagrange multiplier
+            aispii += a[i*nsp+s]*S[i+1]; // S[i+1] = pi_i, the lagrange multiplier
         }
-        dlnns[s] = -mu_RTs + dlnn + aijpii;
+        dlnns[s] = -mu_RTs + dlnn + aispii;
     }
     return; 
 }
@@ -145,9 +152,10 @@ int pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* M,doub
     double *A, *B, *S, *G0_RTs, *ns, *bi0, *dlnns; // Dynamic arrays
     double *lp;
     int neq,s,i,k;
-    double M0,n,M1,errorL2;
+    double M0,n,M1,errorL2,thing;
 
     const double tol=1e-6;
+    const int attempts=10;
 
     neq= nel+1;
     A     = (double*) malloc(sizeof(double)*neq*neq); // Iteration Jacobian
@@ -163,7 +171,9 @@ int pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* M,doub
     for (s=0; s<nsp; s++) M0 += M[s]*X0[s];
     for (i=0; i<nel; i++){
         bi0[i] = 0.0;
-        for (s=0; s<nsp; s++) bi0[i] += a[i*nel + s]*X0[s]/M0;
+        for (s=0; s<nsp; s++){
+            bi0[i] += a[i*nsp + s]*X0[s]/M0;
+            }
     }
     n = 0.0;
     for (s=0; s<nsp; s++) n += X0[s]/M0;
@@ -176,7 +186,7 @@ int pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* M,doub
     }
 
     // Begin Iterations
-    for (k=0; k<20; k++){
+    for (k=0; k<attempts; k++){
         pt_Assemble_Matrices(a, bi0, G0_RTs, p, ns, n, nsp, nel, A, B);
         solve_matrix(A, B, S, neq);
         species_corrections(S, a, G0_RTs, p, n, ns, nsp, nel, dlnns);
@@ -187,8 +197,8 @@ int pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* M,doub
         errorL2 = pow(errorL2, 0.5);
         if (errorL2<tol) break;
 
-        if (k>19) {
-            printf("Solver not converged, exiting!");
+        if (k>=attempts) {
+            printf("Solver not converged, exiting!\n");
             return 1;
         }
     }
