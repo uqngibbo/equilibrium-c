@@ -7,6 +7,7 @@ Python wrapper for ceq core
 from string import ascii_letters
 from numpy import array, zeros
 from ctypes import cdll,c_double,POINTER,c_int
+from lewis_thermo import get_species
 
 letters = set(ascii_letters)
 DBPATH = '/home/qungibbo/programs/us3d/1.0-RC22.12/props/lewis_thermo.db'
@@ -86,6 +87,24 @@ def pt(p, T, Xs0, nsp, nel, lewis, M, a):
     lib.pt(pp, Tp, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p)
     return Xs1
 
+def rhou(rho, u, Xs0, nsp, nel, lewis, M, a):
+    """ Call c library to compute equilibrium concentrations at fixed rho, u """
+    Xs1 = zeros(Xs0.shape)
+    rhop = c_double(rho)
+    up = c_double(u)
+
+    c_double_p = POINTER(c_double)
+    Xs0p  = Xs0.ctypes.data_as(c_double_p)
+    Mp    = M.ctypes.data_as(c_double_p)
+    lewisp= lewis.ctypes.data_as(c_double_p)
+    ap    = a.ctypes.data_as(c_double_p)
+    Xs1p  = Xs1.ctypes.data_as(c_double_p)
+
+    lib = cdll.LoadLibrary('./libceq.so')
+    lib.rhou(rhop, up, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p)
+    return Xs1
+
+
 def test_pt():
     spnames = ['CO2', 'CO', 'O2']
     T = 2500.0
@@ -126,6 +145,62 @@ def test_pt():
     print("Target: ", Xst)
     return
 
+def test_rhou():
+    spnames = ['CO2', 'CO', 'O2']
+    T = 2500.0
+    p = 0.1*101.35e3
+    Xs0 = array([1.0, 0.0, 0.0])
+    Xst = array([0.66108962603325838,0.22594024931116111,0.11297012465558055])
+
+    atoms = []
+    M = []
+    lewisdata = []
+    for sp in spnames:
+        asp, Msp, lsp = get_thermo_data(sp)
+        atoms.append(asp)
+        M.append(Msp)
+        lewisdata.append(lsp)
+
+    M = array(M)
+    lewisdata = array(lewisdata)
+
+    elements = set()
+    for a in atoms:
+        for k in a.keys(): elements.add(k)
+    elements = list(elements)
+
+    nsp = len(spnames)
+    nel = len(elements)
+
+    a = zeros((len(elements),len(spnames)))
+    for i,s in enumerate(atoms):
+        for k,v in s.items():
+            j = elements.index(k)
+            a[j,i] = v
+
+    Ru = 8.3144598 # uses gram-moles, or regular moles... to match M in lewis_library
+    Mt = sum(Xst*M)
+    Rt = Ru/Mt
+    rhot = p/Rt/T
+    nt = 1/Mt
+    cst = Xst*rhot/Mt
+    nst = Xst/Mt # also cs/rhot 
+    nt2 = nst.sum()
+
+    species = [get_species(sp) for sp in spnames]
+    U0st= [(sp.H0onRT(T) - 1.0)*Ru*T for sp in species]
+    ut = sum(njt*U0jt for njt,U0jt in zip(nst,U0st))
+
+    print("a",a.flatten())
+    print("ut",ut)
+    print("nst",nst)
+    print("rhot",rhot)
+    print("Computing")
+    Xs1 = rhou(rhot, ut, Xs0, nsp, nel, lewisdata, M, a)
+    print("Done: ", Xs1)
+    print("Target: ", Xst)
+    return
     
 if __name__=='__main__':
-    test_pt()
+    #test_pt()
+    test_rhou()

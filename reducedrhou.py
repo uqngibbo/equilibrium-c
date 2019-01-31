@@ -32,19 +32,20 @@ def Assemble_Matrices(a, bi0, rho0, u0, T, ns):
     A = zeros((neq,neq))
     B = zeros((neq))
 
-    G0_RTs = [s.H0onRT(T) - s.S0onR(T) for s in species]
-    U0_RTs = [s.H0onRT(T) - 1.0 for s in species]
-    Cv_Rs = [s.Cp0onR(T) - 1.0 for s in species]
+    G0_RTs = array([s.H0onRT(T) - s.S0onR(T) for s in species])
+    U0_RTs = array([s.H0onRT(T) - 1.0 for s in species])
+    Cv_Rs = array([s.Cp0onR(T) - 1.0 for s in species])
 
     Ru = 8.3144598 # uses gram-moles, or regular moles... to match M in lewis_library
-    n = ns.sum()
-    p = rho0*n*Ru*T
-    lnn = log(n)
-    lnns = log(ns)
-    lnp = log(p/1e5) # Because the standard pressure was one bar
-    mus_RT = G0_RTs + lnns - lnn + lnp
+    #n = ns.sum()
+    #p = rho0*n*Ru*T
+    #lnn = log(n)
+    #lnns = log(ns)
+    #lnp = log(p/1e5) # Because the standard pressure was one bar
+    mu0s_RT = G0_RTs# - 1.0/rho0/Ru/T # ???? FIXME: What is this?
+    mus_RT = mu0s_RT + log(rho0*ns*Ru*T/1e5) # Helmholtz chemical potential
     b = (a*ns).sum(axis=1)
-    u = (ns*U0_RTs/Ru/T).sum()
+    u = (ns*U0_RTs*Ru*T).sum()
 
     # Equation 2.45 
     for k in range(nel):
@@ -58,7 +59,7 @@ def Assemble_Matrices(a, bi0, rho0, u0, T, ns):
         akjnjUj = 0.0
         for j in range(nsp):
             akjnjmuj += a[k,j]*ns[j]*mus_RT[j]
-            akjnjUj += a[k,j]*ns[j]*Cv_Rs[j]
+            akjnjUj += a[k,j]*ns[j]*U0_RTs[j]
 
         A[k,0] = akjnjUj # Temperature correction
         B[k] = bi0[k] - b[k] + akjnjmuj 
@@ -67,7 +68,7 @@ def Assemble_Matrices(a, bi0, rho0, u0, T, ns):
     njCvj = 0.0
     njUj2 = 0.0
     njUjmuj = 0.0
-    for s in range(nsp):
+    for j in range(nsp):
         njCvj += ns[j]*Cv_Rs[j]
         njUj2 += ns[j]*U0_RTs[j]*U0_RTs[j]
         njUjmuj += ns[j]*U0_RTs[j]*mus_RT[j] 
@@ -76,11 +77,11 @@ def Assemble_Matrices(a, bi0, rho0, u0, T, ns):
     for i in range(nel):
         aijnjUj = 0.0
         for j in range(nsp):
-            aijnjUj = a[i,j]*ns[j]*U0_RTs[j]
+            aijnjUj += a[i,j]*ns[j]*U0_RTs[j]
         A[nel,1+i] = aijnjUj  # Lagrange multipliers
 
-    B[nel] = u0 - u + njUjmuj 
-    print(A,B)
+    B[nel] = (u0 - u)/Ru/T + njUjmuj 
+    #print(A,B)
 
     return A,B
 
@@ -90,14 +91,15 @@ def get_dlnns(corrections, a, rho0, ns, T):
     dlnT = corrections[0]
     pii = corrections[1:]
 
-    G0_RTs = [s.H0onRT(T) - s.S0onR(T) for s in species]
-    U0_RTs = [s.H0onRT(T) - 1.0 for s in species]
-    n = ns.sum()
-    p = rho0*n*Ru*T
-    lnn = log(n)
-    lnns = log(ns)
-    lnp = log(p/1e5) # Because the standard pressure was one bar
-    mus_RT = G0_RTs + lnns - lnn + lnp
+    G0_RTs = array([s.H0onRT(T) - s.S0onR(T) for s in species])
+    U0_RTs = array([s.H0onRT(T) - 1.0 for s in species])
+    #n = ns.sum()
+    #p = rho0*n*Ru*T
+    #lnn = log(n)
+    #lnns = log(ns)
+    #lnp = log(p/1e5) # Because the standard pressure was one bar
+    mu0s_RT = G0_RTs# - 1.0/rho0/Ru/T # ???? which density do I use here?
+    mus_RT = mu0s_RT + log(rho0*ns*Ru*T/1e5) # Helmholtz chemical potential
 
     aijpii = zeros(nsp) 
     for i in range(nel): aijpii += a[i,:]*pii[i]
@@ -105,13 +107,14 @@ def get_dlnns(corrections, a, rho0, ns, T):
     dlnns = -mus_RT + U0_RTs*dlnT + aijpii
     return dlnns
 
-def update_unknowns(corrections, dlnns, ns, n):
+def update_unknowns(corrections, dlnns, ns, T):
     # unpack corrections and rescale
     dlnT = corrections[0]
     pii = corrections[1:]
 
     ns_new = exp(log(ns) + dlnns)
     T_new = exp(log(T) + dlnT)
+    print("Tnew", T_new, "ns_new", ns_new)
     return T_new, ns_new, pii
 
 def rhoueq_reduced(spnames, rho, u, Xs0,tol=1e-6):
@@ -120,6 +123,7 @@ def rhoueq_reduced(spnames, rho, u, Xs0,tol=1e-6):
     for s in species:
         for k in s.atoms.keys(): elements.add(k)
     elements = list(elements)
+    elements.sort()
 
     nsp = len(species)
     nel = len(elements)
@@ -138,21 +142,30 @@ def rhoueq_reduced(spnames, rho, u, Xs0,tol=1e-6):
     Ru = 8.3144598 # uses gram-moles, or regular moles... to match M in lewis_library
     pii = zeros(bi0.shape)
     ns= ns0*0.0 + ns0.sum()/ns0.size
-    Cps298 = array([sp.Cp0onR(298.15)*Ru for sp in species])
-    uf = ns*cps*298.15
-    ucc = ns*(Cps298 - Ru)
-    T = (u + uf.sum())/(ucc.sum()) # Guess using constant Cp at 298.15
-    print(ns, T)
 
+    Cps298 = array([sp.Cp0onR(298.15)*Ru for sp in species])
+    Hf298 = array([sp.H0onRT(298.15)*Ru*298.15 for sp in species])
+    uf = ns0*(Cps298*298.15 - Hf298) # Use ns or ns0???
+    cv = ns0*(Cps298 - Ru)
+    T = (u + uf.sum())/(cv.sum()) # Guess using constant Cp at 298.15
+    print("Guess Cps:", Cps298)
+    print("Guess Hf:", Hf298)
+    print("Guess ns:", ns)
+    print("Guess uf:", uf)
+    print("Guess cv:", cv)
+    print("Guess T:", T)
 
     for k in range(20):
         A,B = Assemble_Matrices(a, bi0, rho, u, T, ns)
         corrections = solve(A,B)
-        dlnns = get_dlnns(corrections, a, rho0, ns, T)
+        print("corrections:", corrections)
+        dlnns = get_dlnns(corrections, a, rho, ns, T)
+        print("dlnns:", dlnns)
         error = dlnns
         errorL2 = ((error.dot(error)).sum())**0.5
         print(dlnns, errorL2,'\n')
-        ns, n, pii = update_unknowns(corrections, dlnns, ns, n)
+        T, ns, pii = update_unknowns(corrections, dlnns, ns, T)
+        print("Iter:", T, ns)
 
         if errorL2<tol: break
     else:
@@ -160,6 +173,7 @@ def rhoueq_reduced(spnames, rho, u, Xs0,tol=1e-6):
         print(ns, n, pii,corrections,errorL2)
         raise Exception
 
+    n = ns.sum()
     return ns, n
 
 
@@ -182,15 +196,18 @@ if __name__=='__main__':
 
     U0st= [(sp.H0onRT(T) - 1.0)*Ru*T for sp in species]
     ut = sum(njt*U0jt for njt,U0jt in zip(nst,U0st))
+
     print("Mt", Mt)
     print("rhot", rhot)
-    print("cst"  , cst)
-    print("nst"  , nst)
+    print("cst" , cst)
+    print("nst" , nst)
     print("nt"  , nt)
-    print("nt2"  , nt2)
+    print("nt2" , nt2)
     print("ut"  , ut)
+    print("Ut"  , U0st)
+    print("Tt"  , T)
 
-    ns, n = rhoueq_reduced(spnames, p, T, Xs0)
+    ns, n = rhoueq_reduced(spnames, rhot, ut, Xs0)
     M1 = 1.0/n
     Xs1 = M1*ns
     print("result", Xs1)
