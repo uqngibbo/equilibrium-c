@@ -227,8 +227,10 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
     for (k=0; k<attempts; k++){
         Assemble_Matrices(a,bi0,rho,u,T,ns,nsp,nel,A,B,G0_RTs,U0_RTs,Cv0_Rs,lewis);
         solve_matrix(A, B, S, neq);
+        printf("corrections: %f %f %f\n", S[0], S[1], S[2]);
         species_corrections(S,a,G0_RTs,U0_RTs,rho,T,ns,nsp,nel,dlnns);
         update_unknowns(S, dlnns, nsp, ns, &T);
+        printf("iter: %f %f %f %f \n\n", T, ns[0], ns[1], ns[2]);
 
         errorL2 = 0.0;
         for (s=0; s<nsp; s++) errorL2 += dlnns[s]*dlnns[s];
@@ -243,6 +245,8 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
     
     printf("Converged in %d iter, error: %f\n", k, errorL2);
     // Compute output composition
+    n = 0.0;
+    for (s=0; s<nsp; s++) n += ns[s];
     M1 = 1.0/n;
     for (s=0; s<nsp; s++) X1[s] = M1*ns[s];
 

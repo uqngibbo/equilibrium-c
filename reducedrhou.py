@@ -114,7 +114,6 @@ def update_unknowns(corrections, dlnns, ns, T):
 
     ns_new = exp(log(ns) + dlnns)
     T_new = exp(log(T) + dlnT)
-    print("Tnew", T_new, "ns_new", ns_new)
     return T_new, ns_new, pii
 
 def rhoueq_reduced(spnames, rho, u, Xs0,tol=1e-6):
@@ -124,6 +123,7 @@ def rhoueq_reduced(spnames, rho, u, Xs0,tol=1e-6):
         for k in s.atoms.keys(): elements.add(k)
     elements = list(elements)
     elements.sort()
+    print(elements)
 
     nsp = len(species)
     nel = len(elements)
@@ -148,11 +148,6 @@ def rhoueq_reduced(spnames, rho, u, Xs0,tol=1e-6):
     uf = ns0*(Cps298*298.15 - Hf298) # Use ns or ns0???
     cv = ns0*(Cps298 - Ru)
     T = (u + uf.sum())/(cv.sum()) # Guess using constant Cp at 298.15
-    print("Guess Cps:", Cps298)
-    print("Guess Hf:", Hf298)
-    print("Guess ns:", ns)
-    print("Guess uf:", uf)
-    print("Guess cv:", cv)
     print("Guess T:", T)
 
     for k in range(20):
@@ -160,12 +155,12 @@ def rhoueq_reduced(spnames, rho, u, Xs0,tol=1e-6):
         corrections = solve(A,B)
         print("corrections:", corrections)
         dlnns = get_dlnns(corrections, a, rho, ns, T)
-        print("dlnns:", dlnns)
         error = dlnns
         errorL2 = ((error.dot(error)).sum())**0.5
-        print(dlnns, errorL2,'\n')
+        print("dlnns:", dlnns, errorL2)
         T, ns, pii = update_unknowns(corrections, dlnns, ns, T)
         print("Iter:", T, ns)
+        print(' ')
 
         if errorL2<tol: break
     else:

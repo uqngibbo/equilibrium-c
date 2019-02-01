@@ -128,6 +128,8 @@ def test_pt():
     for a in atoms:
         for k in a.keys(): elements.add(k)
     elements = list(elements)
+    elements.sort()
+    print("elements", elements)
 
     nsp = len(spnames)
     nel = len(elements)
@@ -168,6 +170,8 @@ def test_rhou():
     for a in atoms:
         for k in a.keys(): elements.add(k)
     elements = list(elements)
+    elements.sort()
+    print("elements", elements)
 
     nsp = len(spnames)
     nel = len(elements)
