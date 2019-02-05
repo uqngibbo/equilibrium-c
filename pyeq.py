@@ -6,7 +6,7 @@ Python wrapper for ceq core
 
 from string import ascii_letters
 from numpy import array, zeros
-from ctypes import cdll,c_double,POINTER,c_int
+from ctypes import cdll,c_double,POINTER,c_int,byref
 from lewis_thermo import get_species
 
 letters = set(ascii_letters)
@@ -70,7 +70,47 @@ def get_thermo_data(name):
 
     return atoms, M, lewis
 
-def pt(p, T, Xs0, nsp, nel, lewis, M, a):
+def startup(spnames):
+    atoms = []
+    M = []
+    lewisdata = []
+    for sp in spnames:
+        asp, Msp, lsp = get_thermo_data(sp)
+        atoms.append(asp)
+        M.append(Msp)
+        lewisdata.append(lsp)
+
+    M = array(M)
+    lewisdata = array(lewisdata)
+
+    elements = set()
+    for a in atoms:
+        for k in a.keys(): elements.add(k)
+    elements = list(elements)
+    elements.sort()
+    print("elements", elements)
+
+    nsp = len(spnames)
+    nel = len(elements)
+
+    a = zeros((len(elements),len(spnames)))
+    for i,s in enumerate(atoms):
+        for k,v in s.items():
+            j = elements.index(k)
+            a[j,i] = v
+
+    print("a",a.flatten())
+    return elements, nsp, nel, lewisdata, a, M
+
+def load_library():
+    """ Load the c library and set return types """
+    lib = cdll.LoadLibrary('./libceq.so')
+    lib.batch_pt.restype = c_int
+    lib.pt.restype = c_int
+    lib.rhou.restype = c_int
+    return lib
+
+def pt(p, T, Xs0, nsp, nel, lewis, M, a,verbose=0):
     """ Call c library to compute equilibrium concentrations at fixed p, T """
     Xs1 = zeros(Xs0.shape)
     pp = c_double(p)
@@ -83,15 +123,17 @@ def pt(p, T, Xs0, nsp, nel, lewis, M, a):
     ap    = a.ctypes.data_as(c_double_p)
     Xs1p  = Xs1.ctypes.data_as(c_double_p)
 
-    lib = cdll.LoadLibrary('./libceq.so')
-    lib.pt(pp, Tp, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p)
+    lib = load_library()
+    recode = lib.pt(pp, Tp, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p, verbose)
     return Xs1
 
-def rhou(rho, u, Xs0, nsp, nel, lewis, M, a):
+def rhou(rho, u, Xs0, nsp, nel, lewis, M, a,verbose=0):
     """ Call c library to compute equilibrium concentrations at fixed rho, u """
     Xs1 = zeros(Xs0.shape)
     rhop = c_double(rho)
     up = c_double(u)
+    Tp = c_double()
+    Tref = byref(Tp)
 
     c_double_p = POINTER(c_double)
     Xs0p  = Xs0.ctypes.data_as(c_double_p)
@@ -100,111 +142,56 @@ def rhou(rho, u, Xs0, nsp, nel, lewis, M, a):
     ap    = a.ctypes.data_as(c_double_p)
     Xs1p  = Xs1.ctypes.data_as(c_double_p)
 
-    lib = cdll.LoadLibrary('./libceq.so')
-    lib.rhou(rhop, up, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p)
+    lib = load_library()
+    recode = lib.rhou(rhop, up, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p, Tref, verbose)
+    T = Tp.value
+    return Xs1, T
+
+def batch_pt(p, T, Xs0, nsp, nel, lewis, M, a,verbose=0):
+    """ Call c library to compute equilibrium concentrations at fixed p, T """
+    N, nspcheck = Xs0.shape
+    if nspcheck!=nsp: raise Exception("nsp ({}) != Xs0.shape[1] ({})".format(nsp, nspcheck))
+    if N!=p.size: raise Exception("p.size ({}) != Xs0.shape[0] ({})".format(p.size, N))
+    if N!=T.size: raise Exception("T.size ({}) != Xs0.shape[0] ({})".format(T.size, N))
+
+    Xs1 = zeros(Xs0.shape)
+
+    c_double_p = POINTER(c_double)
+    pp    = p.ctypes.data_as(c_double_p)
+    Tp    = T.ctypes.data_as(c_double_p)
+    Xs0p  = Xs0.ctypes.data_as(c_double_p)
+    Mp    = M.ctypes.data_as(c_double_p)
+    lewisp= lewis.ctypes.data_as(c_double_p)
+    ap    = a.ctypes.data_as(c_double_p)
+    Xs1p  = Xs1.ctypes.data_as(c_double_p)
+
+    lib = load_library()
+    recode = lib.batch_pt(N, pp, Tp, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p, verbose)
     return Xs1
 
+def batch_rhou(rho, u, Xs0, nsp, nel, lewis, M, a,verbose=0):
+    """ Call c library to compute equilibrium concentrations at fixed rho, u """
+    N, nspcheck = Xs0.shape
+    if nspcheck!=nsp: raise Exception("nsp ({}) != Xs0.shape[1] ({})".format(nsp, nspcheck))
+    if N!=rho.size: raise Exception("rho.size ({}) != Xs0.shape[0] ({})".format(rho.size, N))
+    if N!=u.size: raise Exception("u.size ({}) != Xs0.shape[0] ({})".format(u.size, N))
 
-def test_pt():
-    spnames = ['CO2', 'CO', 'O2']
-    T = 2500.0
-    p = 0.1*101.35e3
-    Xs0 = array([1.0, 0.0, 0.0])
-    Xst = array([0.66108962603325838,0.22594024931116111,0.11297012465558055])
+    Xs1 = zeros(Xs0.shape)
+    T = zeros(rho.shape)
 
-    atoms = []
-    M = []
-    lewisdata = []
-    for sp in spnames:
-        asp, Msp, lsp = get_thermo_data(sp)
-        atoms.append(asp)
-        M.append(Msp)
-        lewisdata.append(lsp)
+    c_double_p = POINTER(c_double)
+    rhop  = rho.ctypes.data_as(c_double_p)
+    up    = u.ctypes.data_as(c_double_p)
+    Tp    = T.ctypes.data_as(c_double_p)
+    Xs0p  = Xs0.ctypes.data_as(c_double_p)
+    Mp    = M.ctypes.data_as(c_double_p)
+    lewisp= lewis.ctypes.data_as(c_double_p)
+    ap    = a.ctypes.data_as(c_double_p)
+    Xs1p  = Xs1.ctypes.data_as(c_double_p)
 
-    M = array(M)
-    lewisdata = array(lewisdata)
+    lib = load_library()
+    recode = lib.batch_rhou(N, rhop, up, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p, Tp, verbose)
+    return Xs1, T
 
-    elements = set()
-    for a in atoms:
-        for k in a.keys(): elements.add(k)
-    elements = list(elements)
-    elements.sort()
-    print("elements", elements)
-
-    nsp = len(spnames)
-    nel = len(elements)
-
-    a = zeros((len(elements),len(spnames)))
-    for i,s in enumerate(atoms):
-        for k,v in s.items():
-            j = elements.index(k)
-            a[j,i] = v
-
-    print("a",a.flatten())
-    print("Computing")
-    Xs1 = pt(p, T, Xs0, nsp, nel, lewisdata, M, a)
-    print("Done: ", Xs1)
-    print("Target: ", Xst)
-    return
-
-def test_rhou():
-    spnames = ['CO2', 'CO', 'O2']
-    T = 2500.0
-    p = 0.1*101.35e3
-    Xs0 = array([1.0, 0.0, 0.0])
-    Xst = array([0.66108962603325838,0.22594024931116111,0.11297012465558055])
-
-    atoms = []
-    M = []
-    lewisdata = []
-    for sp in spnames:
-        asp, Msp, lsp = get_thermo_data(sp)
-        atoms.append(asp)
-        M.append(Msp)
-        lewisdata.append(lsp)
-
-    M = array(M)
-    lewisdata = array(lewisdata)
-
-    elements = set()
-    for a in atoms:
-        for k in a.keys(): elements.add(k)
-    elements = list(elements)
-    elements.sort()
-    print("elements", elements)
-
-    nsp = len(spnames)
-    nel = len(elements)
-
-    a = zeros((len(elements),len(spnames)))
-    for i,s in enumerate(atoms):
-        for k,v in s.items():
-            j = elements.index(k)
-            a[j,i] = v
-
-    Ru = 8.3144598 # uses gram-moles, or regular moles... to match M in lewis_library
-    Mt = sum(Xst*M)
-    Rt = Ru/Mt
-    rhot = p/Rt/T
-    nt = 1/Mt
-    cst = Xst*rhot/Mt
-    nst = Xst/Mt # also cs/rhot 
-    nt2 = nst.sum()
-
-    species = [get_species(sp) for sp in spnames]
-    U0st= [(sp.H0onRT(T) - 1.0)*Ru*T for sp in species]
-    ut = sum(njt*U0jt for njt,U0jt in zip(nst,U0st))
-
-    print("a",a.flatten())
-    print("ut",ut)
-    print("nst",nst)
-    print("rhot",rhot)
-    print("Computing")
-    Xs1 = rhou(rhot, ut, Xs0, nsp, nel, lewisdata, M, a)
-    print("Done: ", Xs1)
-    print("Target: ", Xst)
-    return
-    
 if __name__=='__main__':
-    #test_pt()
-    test_rhou()
+    print("Called pyeq main!")

@@ -99,6 +99,7 @@ static void species_corrections(double* S,double* a,double* G0_RTs,double p,doub
     dlnn = S[0];
     lnn = log(n);
     lnp = log(p/1e5);
+    printf("L[0] = %e   L[1] = %e\n", S[1], S[2]);
 
     for (s=0; s<nsp; s++) {
         mu_RTs = G0_RTs[s] + log(ns[s]) - lnn + lnp;
@@ -134,7 +135,7 @@ static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* n
     return;
 }
 
-int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* M,double* a,double* X1){
+int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* M,double* a,double* X1,int verbose){
     /*
     Compute the equilibrium composition X1 at a fixed temperature and pressure
     Inputs:
@@ -146,6 +147,7 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         lewis : Nasa Lewis Thermodynamic Database Data [nsp*3*9]
         M     : Molar Mass of each species (kg/mol) [nsp]
         a     : elemental composition array [nel,nsp]
+        verbose: print debugging information
 
     Output:
         X1 : Equilibrium Mole Fraction [nsp]  
@@ -196,6 +198,7 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         errorL2 = 0.0;
         for (s=0; s<nsp; s++) errorL2 += dlnns[s]*dlnns[s];
         errorL2 = pow(errorL2, 0.5);
+        if (verbose>0) printf("iter %d: %f %f %f %f  (%e) \n", k, n, ns[0], ns[1], ns[2], errorL2);
         if (errorL2<tol) break;
 
         if (k>=attempts) {
@@ -204,6 +207,7 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         }
     }
     
+    if (verbose>0) printf("Converged in %d iter, error: %e\n", k, errorL2);
     // Compute output composition
     M1 = 1.0/n;
     for (s=0; s<nsp; s++) X1[s] = M1*ns[s];

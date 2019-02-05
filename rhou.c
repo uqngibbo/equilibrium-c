@@ -158,7 +158,7 @@ static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* T
 }
 
 int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,double* M,double* a,
-               double* X1){
+               double* X1, double* Teq, int verbose){
     /*
     Compute the equilibrium composition X1 at a fixed volume and internal energy 
     Inputs:
@@ -170,9 +170,11 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
         lewis : Nasa Lewis Thermodynamic Database Data [nsp*3*9]
         M     : Molar Mass of each species (kg/mol) [nsp]
         a     : elemental composition array [nel,nsp]
+        verbose: print debugging information
 
     Output:
-        X1 : Equilibrium Mole Fraction [nsp]  
+        X1  : Equilibrium Mole Fraction [nsp]  
+        Teq: Equilibrium Temperature 
     */
     double *A, *B, *S, *G0_RTs, *U0_RTs, *Cv0_Rs, *ns, *bi0, *dlnns; // Dynamic arrays
     double *lp;
@@ -221,20 +223,19 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
         cv += cvs;
     }
     T = (u + uf)/cv;
-    printf("Guess T: %f\n", T);
+    if (verbose>0) printf("Guess T: %f\n", T);
 
     // Begin Iterations
     for (k=0; k<attempts; k++){
         Assemble_Matrices(a,bi0,rho,u,T,ns,nsp,nel,A,B,G0_RTs,U0_RTs,Cv0_Rs,lewis);
         solve_matrix(A, B, S, neq);
-        printf("corrections: %f %f %f\n", S[0], S[1], S[2]);
         species_corrections(S,a,G0_RTs,U0_RTs,rho,T,ns,nsp,nel,dlnns);
         update_unknowns(S, dlnns, nsp, ns, &T);
-        printf("iter: %f %f %f %f \n\n", T, ns[0], ns[1], ns[2]);
 
         errorL2 = 0.0;
         for (s=0; s<nsp; s++) errorL2 += dlnns[s]*dlnns[s];
         errorL2 = pow(errorL2, 0.5);
+        if (verbose>0) printf("iter %d: %f %f %f %f  (%e) \n", k, T, ns[0], ns[1], ns[2], errorL2);
         if (errorL2<tol) break;
 
         if (k>=attempts) {
@@ -243,12 +244,13 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
         }
     }
     
-    printf("Converged in %d iter, error: %f\n", k, errorL2);
+    if (verbose>0) printf("Converged in %d iter, error: %e\n", k, errorL2);
     // Compute output composition
     n = 0.0;
     for (s=0; s<nsp; s++) n += ns[s];
     M1 = 1.0/n;
     for (s=0; s<nsp; s++) X1[s] = M1*ns[s];
+    *Teq = T;
 
     free(A);
     free(B);
