@@ -47,6 +47,7 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
         }
         akjnjmuj = 0.0;
         for (j=0; j<nsp; j++){
+            if (ns[j]==0.0) continue;
             mus_RTj = G0_RTs[j] + log(ns[j]) - lnn + lnp;
             akjnjmuj += a[k*nsp+j]*ns[j]*mus_RTj;
 
@@ -60,6 +61,7 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
     nss = 0.0;
     nsmus = 0.0;
     for (j=0; j<nsp; j++){
+        if (ns[j]==0.0) continue;
         mus_RTj = G0_RTs[j] + log(ns[j]) - lnn + lnp; // I guess its okay to compute this again
         nss += ns[j];
         nsmus += ns[j]*mus_RTj;
@@ -99,9 +101,9 @@ static void species_corrections(double* S,double* a,double* G0_RTs,double p,doub
     dlnn = S[0];
     lnn = log(n);
     lnp = log(p/1e5);
-    printf("L[0] = %e   L[1] = %e\n", S[1], S[2]);
 
     for (s=0; s<nsp; s++) {
+        if (ns[s]==0.0) { dlnns[s] = 0.0; continue;}
         mu_RTs = G0_RTs[s] + log(ns[s]) - lnn + lnp;
 
         aispii = 0.0;
@@ -125,13 +127,22 @@ static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* n
         n  : pointer to total moles/mixture (passed by reference!) [1]
     */
     int s;
-    double lnns,lnn;
+    double lnns,lnn,n_copy;
+    lnn = log(*n); // compute the log of the thing n is pointing to
+    n_copy = exp(lnn + S[0]); 
+    *n = n_copy;   // thing pointed to by n set to exp(lnn + S[0]);
+
     for (s=0; s<nsp; s++){
+        if (ns[s]==0.0) continue;
+
         lnns = log(ns[s]);
         ns[s] = exp(lnns + dlnns[s]);
+
+        if (ns[s]/n_copy<TRACELIMIT) {
+            ns[s] = 0.0;
+        }
     }
-    lnn = log(*n); // compute the log of the thing n is pointing to
-    *n = exp(lnn + S[0]); // thing pointed to by n set to exp(lnn + S[0]);
+
     return;
 }
 
@@ -154,11 +165,11 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     */
     double *A, *B, *S, *G0_RTs, *ns, *bi0, *dlnns; // Dynamic arrays
     double *lp;
-    int neq,s,i,k;
+    int neq,s,i,k,ntrace;
     double M0,n,M1,errorL2,thing;
 
     const double tol=1e-6;
-    const int attempts=10;
+    const int attempts=30;
 
     neq= nel+1;
     A     = (double*) malloc(sizeof(double)*neq*neq); // Iteration Jacobian
@@ -188,25 +199,42 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         G0_RTs[s] = compute_G0_RT(T, lp);
     }
 
-    // Begin Iterations
-    for (k=0; k<attempts; k++){
+    // Main Iteration Loop: 
+    for (k=0; k<=attempts; k++){
+        // 1: Perform an update of the equations
         Assemble_Matrices(a, bi0, G0_RTs, p, ns, n, nsp, nel, A, B);
         solve_matrix(A, B, S, neq);
         species_corrections(S, a, G0_RTs, p, n, ns, nsp, nel, dlnns);
         update_unknowns(S, dlnns, nsp, ns, &n);
 
+        // Compute remaining error by checking species corrections
         errorL2 = 0.0;
         for (s=0; s<nsp; s++) errorL2 += dlnns[s]*dlnns[s];
         errorL2 = pow(errorL2, 0.5);
         if (verbose>0) printf("iter %d: %f %f %f %f  (%e) \n", k, n, ns[0], ns[1], ns[2], errorL2);
+
+        // Check for imminent singularity
+        ntrace=0;
+        for (s=0; s<nsp; s++) if (ns[s]==0.0) ntrace++;
+        if (ntrace==nsp-1) { // Pseudo convergence criteria, all the species but one are trace
+            for (s=0; s<nsp; s++) if (ns[s]!=0.0) i=s;
+            n = 1.0/M[i];
+            ns[i] = n;
+            errorL2 = 0.0;
+            if (verbose>0) printf("Pseudo convergence! Remaining species: (%d)\n", i);
+        }
+
+        // Exit loop of convergence is achieved
         if (errorL2<tol) break;
 
-        if (k>=attempts) {
+        // Exit loop if too many attempts are undertaken
+        if (k==attempts) {
             printf("Solver not converged, exiting!\n");
             return 1;
         }
     }
     
+    if (verbose>0) printf("Converged in %d iter, error: %e\n", k, errorL2);
     if (verbose>0) printf("Converged in %d iter, error: %e\n", k, errorL2);
     // Compute output composition
     M1 = 1.0/n;
