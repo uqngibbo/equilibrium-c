@@ -111,6 +111,7 @@ static void species_corrections(double* S,double* a,double* G0_RTs,double p,doub
             aispii += a[i*nsp+s]*S[i+1]; // S[i+1] = pi_i, the lagrange multiplier
         }
         dlnns[s] = -mu_RTs + dlnn + aispii;
+        //printf("dllns[%d] %f %f %f (%f) %f\n",s,-mu_RTs, dlnn, aispii, dlnns[s], lnn);
     }
     return; 
 }
@@ -127,16 +128,19 @@ static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* n
         n  : pointer to total moles/mixture (passed by reference!) [1]
     */
     int s;
-    double lnns,lnn,n_copy;
+    double lnns,lnn,n_copy,lambda;
+
     lnn = log(*n); // compute the log of the thing n is pointing to
-    n_copy = exp(lnn + S[0]); 
+    lambda = fmin(1.0, 0.5*fabs(lnn)/fabs(S[0]));
+    n_copy = exp(lnn + lambda*S[0]); 
     *n = n_copy;   // thing pointed to by n set to exp(lnn + S[0]);
 
     for (s=0; s<nsp; s++){
         if (ns[s]==0.0) continue;
-
         lnns = log(ns[s]);
-        ns[s] = exp(lnns + dlnns[s]);
+
+        lambda = fmin(1.0, fabs(lnn)/fabs(dlnns[s]));
+        ns[s] = exp(lnns + lambda*dlnns[s]);
 
         if (ns[s]/n_copy<TRACELIMIT) {
             ns[s] = 0.0;
@@ -226,6 +230,11 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
 
         // Exit loop of convergence is achieved
         if (errorL2<tol) break;
+
+        if (isnan(errorL2)) {
+            printf("Solver nan'd, exiting!\n");
+            return 1;
+        }
 
         // Exit loop if too many attempts are undertaken
         if (k==attempts) {
