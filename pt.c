@@ -142,9 +142,7 @@ static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* n
         lambda = fmin(1.0, fabs(lnn)/fabs(dlnns[s]));
         ns[s] = exp(lnns + lambda*dlnns[s]);
 
-        if (ns[s]/n_copy<TRACELIMIT) {
-            ns[s] = 0.0;
-        }
+        if (ns[s]/n_copy<TRACELIMIT) ns[s] = 0.0;
     }
 
     return;
@@ -243,7 +241,6 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         }
     }
     
-    if (verbose>0) printf("Converged in %d iter, error: %e\n", k, errorL2);
     if (verbose>0) printf("Converged in %d iter, error: %e\n", k, errorL2);
     // Compute output composition
     M1 = 1.0/n;

@@ -147,14 +147,56 @@ static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* T
         T  : pointer to temperature guess (passed by reference!) [1]
     */
     int s;
-    double lnns,lnT;
+    double lnns,lnT,n,lnn,lambda;
+    lnT = log(*T); // compute the log of the thing T is pointing to
+    lambda = fmin(1.0, 0.5*fabs(lnT)/fabs(S[0]));
+    *T = exp(lnT + lambda*S[0]); // thing pointed to by T set to exp(lnT + S[0]);
+
+    n = 0.0; for (s=0; s<nsp; s++) n+=ns[s]; lnn=log(n);
+
     for (s=0; s<nsp; s++){
         lnns = log(ns[s]);
-        ns[s] = exp(lnns + dlnns[s]);
+        lambda = fmin(1.0, fabs(lnn)/fabs(dlnns[s]));
+        ns[s] = exp(lnns + lambda*dlnns[s]);
+
+        if (ns[s]/n<TRACELIMIT) ns[s] = 0.0;
     }
-    lnT = log(*T); // compute the log of the thing T is pointing to
-    *T = exp(lnT + S[0]); // thing pointed to by T set to exp(lnT + S[0]);
     return;
+}
+
+double temperature_guess(int nsp, double u, double M0, double* X0, double* lewis){
+    /*
+    Guess a first iteration temperature assuming constant Cv from 298 K
+    Inputs:
+        nsp   : Number of species
+        u     : Target mixture internal energy (J/kg)
+        M0    : Initial composition molecular weight (kg/mol)
+        X0    : Intiial composition mole fractions [nsp]
+        lewis : Nasa Lewis Thermodynamic Database Data [nsp*3*9]
+
+    Output:
+        T : Temperature Guess (K)
+    */
+    int s;
+    double* lp;
+    double uf,cv,T,ufs,cvs,Cps298,Hfs298,ns0;
+
+    uf = 0.0;
+    cv = 0.0;
+    for (s=0; s<nsp; s++){
+        lp = lewis + 9*3*s;
+        Cps298 = compute_Cp0_R(298.15, lp)*Ru;
+        Hfs298 = compute_H0_RT(298.15, lp)*Ru*298.15;
+
+        ns0 = X0[s]/M0;
+        ufs= ns0*(Cps298*298.15 - Hfs298);
+        cvs= ns0*(Cps298 - Ru);
+
+        uf += ufs;
+        cv += cvs;
+    }
+    T = (u + uf)/cv;
+    return T;
 }
 
 int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,double* M,double* a,
@@ -177,9 +219,8 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
         Teq: Equilibrium Temperature 
     */
     double *A, *B, *S, *G0_RTs, *U0_RTs, *Cv0_Rs, *ns, *bi0, *dlnns; // Dynamic arrays
-    double *lp;
     int neq,s,i,k;
-    double M0,n,M1,errorL2,thing,T,uf,cv,ufs,cvs,ns0,Cps298,Hfs298;
+    double M0,n,M1,errorL2,thing,T;
 
     const double tol=1e-6;
     const int attempts=10;
@@ -207,22 +248,8 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
     n = 0.0;
     for (s=0; s<nsp; s++) n += X0[s]/M0;
     for (s=0; s<nsp; s++) ns[s] = n/nsp;
-    // Temperature guess is a bit tricky
-    uf = 0.0;
-    cv = 0.0;
-    for (s=0; s<nsp; s++){
-        lp = lewis + 9*3*s;
-        Cps298 = compute_Cp0_R(298.15, lp)*Ru;
-        Hfs298 = compute_H0_RT(298.15, lp)*Ru*298.15;
 
-        ns0 = X0[s]/M0;
-        ufs= ns0*(Cps298*298.15 - Hfs298);
-        cvs= ns0*(Cps298 - Ru);
-
-        uf += ufs;
-        cv += cvs;
-    }
-    T = (u + uf)/cv;
+    T = temperature_guess(nsp, u, M0, X0, lewis);
     if (verbose>0) printf("Guess T: %f\n", T);
 
     // Begin Iterations
