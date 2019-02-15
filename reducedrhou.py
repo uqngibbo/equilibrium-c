@@ -171,7 +171,6 @@ def rhoueq_reduced(spnames, rho, u, Xs0,tol=1e-6):
     n = ns.sum()
     return ns, n
 
-
 if __name__=='__main__':
     spnames = ['CO2', 'CO', 'O2']
     T = 2500.0
@@ -201,6 +200,7 @@ if __name__=='__main__':
     print("ut"  , ut)
     print("Ut"  , U0st)
     print("Tt"  , T)
+
 
     ns, n = rhoueq_reduced(spnames, rhot, ut, Xs0)
     M1 = 1.0/n

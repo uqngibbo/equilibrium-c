@@ -16,6 +16,7 @@ C library for equilibrium chemistry calculations
 #include <math.h>
 #include <stdlib.h>
 
+#include "thermo.h"
 #include "pt.h"
 #include "rhou.h"
 #include "ceq.h"
@@ -61,6 +62,36 @@ int rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,double* M,
         T  : Equilibrium Temperature 
     */
     return solve_rhou(rho, u, X0,nsp,nel, lewis, M, a, X1, T, verbose);
+}
+
+double get_u(double T, double* X, int nsp, double* lewis, double* M){
+    /*
+    Compute thermal equilibrium u from known composition and primitives
+    Inputs:
+        T     : Temperature (K)
+        X     : Composition [nsp]
+        nsp   : number of species 
+        lewis : Nasa Lewis Thermodynamic Database Data [nsp*3*9]
+        M     : Molar Mass of each species (kg/mol) [nsp]
+        verbose: print debugging information
+
+    Output:
+        u : internal energy per unit mass
+    */
+    int s;
+    double Mmix, u, ns, U0_RTs;
+    double* lp;
+
+    Mmix = 0.0; for (s=0; s<nsp; s++) Mmix+=X[s]*M[s];
+    
+    u = 0.0;
+    for (s=0; s<nsp; s++){
+        ns = X[s]/Mmix;
+        lp = lewis + 9*3*s;
+        U0_RTs = compute_H0_RT(T, lp) - 1.0;
+        u += ns*U0_RTs*Ru*T;
+    }
+    return u;
 }
 
 int batch_pt(int N, double* p,double* T,double* X0,int nsp,int nel,double* lewis,double* M,double* a,
@@ -139,6 +170,32 @@ int batch_rhou(int N, double* rho,double* u,double* X0,int nsp,int nel,double* l
     return 0;
 }
 
+int batch_u(int N, double* T, double* X, int nsp, double* lewis, double* M, double* u){
+    /*
+    Compute thermal equilibrium u from an array of known composition and primitives
+    Inputs:
+        N     : number of points in input arrays
+        p     : Pressure (Pa) [N]
+        T     : Temperature (K) [N]
+        X     : Composition [N,nsp]
+        nsp   : number of species 
+        lewis : Nasa Lewis Thermodynamic Database Data [nsp*3*9]
+        M     : Molar Mass of each species (kg/mol) [nsp]
+        verbose: print debugging information
+
+    Output:
+        u : internal energy per unit mass [N]
+    */
+    int i;
+    double Ti,*Xi;
+
+    for (i=0; i<N; i++){
+        Ti = T[i];
+        Xi = Xi + i*nsp;
+        u[i] = get_u(Ti, Xi, nsp, lewis, M);
+    }
+    return 0;
+}
 
 int main(){
     printf("Called main in ceq.c!\n");
