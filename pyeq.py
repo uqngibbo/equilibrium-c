@@ -9,7 +9,8 @@ from numpy import array, zeros
 from ctypes import cdll,c_double,POINTER,c_int,byref
 
 letters = set(ascii_letters)
-DBPATH = '/home/qungibbo/programs/us3d/1.0-RC22.12/props/lewis_thermo.db'
+#DBPATH = '/home/qungibbo/programs/us3d/1.0-RC22.12/props/lewis_thermo.db'
+DBPATH = '/home/qungibbo/sourcecode/nasacea/thermo.inp'
 
 def readdb(name):
     """ Retrieve species 'name' from the lewis_thermo.db file """

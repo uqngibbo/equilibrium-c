@@ -219,12 +219,13 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
         Teq: Equilibrium Temperature 
     */
     double *A, *B, *S, *G0_RTs, *U0_RTs, *Cv0_Rs, *ns, *bi0, *dlnns; // Dynamic arrays
-    int neq,s,i,k;
+    int neq,s,i,k,errorcode;
     double M0,n,M1,errorL2,thing,T;
 
     const double tol=1e-6;
     const int attempts=10;
 
+    errorcode=0;
     neq= nel+1;
     A     = (double*) malloc(sizeof(double)*neq*neq); // Iteration Jacobian
     B     = (double*) malloc(sizeof(double)*neq);     // Iteration RHS
@@ -267,11 +268,12 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
 
         if (k>=attempts) {
             printf("Solver not converged, exiting!\n");
-            return 1;
+            errorcode=1;
+            break;
         }
     }
     
-    if (verbose>0) printf("Converged in %d iter, error: %e\n", k, errorL2);
+    if ((verbose>0)&&(errorcode==0)) printf("Converged in %d iter, error: %e\n", k, errorL2);
     // Compute output composition
     n = 0.0;
     for (s=0; s<nsp; s++) n += ns[s];
@@ -288,7 +290,7 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
     free(ns);
     free(bi0);
     free(dlnns);
-    return 0;
+    return errorcode;
 }
 
 #ifdef TEST

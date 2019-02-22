@@ -167,12 +167,13 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     */
     double *A, *B, *S, *G0_RTs, *ns, *bi0, *dlnns; // Dynamic arrays
     double *lp;
-    int neq,s,i,k,ntrace;
+    int neq,s,i,k,ntrace,errorcode;
     double M0,n,M1,errorL2,thing;
 
     const double tol=1e-6;
     const int attempts=30;
 
+    errorcode=0;
     neq= nel+1;
     A     = (double*) malloc(sizeof(double)*neq*neq); // Iteration Jacobian
     B     = (double*) malloc(sizeof(double)*neq);     // Iteration RHS
@@ -231,17 +232,19 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
 
         if (isnan(errorL2)) {
             printf("Solver nan'd, exiting!\n");
-            return 1;
+            errorcode=1;
+            break;
         }
 
         // Exit loop if too many attempts are undertaken
         if (k==attempts) {
             printf("Solver not converged, exiting!\n");
-            return 1;
+            errorcode=1;
+            break;
         }
     }
     
-    if (verbose>0) printf("Converged in %d iter, error: %e\n", k, errorL2);
+    if ((verbose>0)&&(errorcode==0)) printf("Converged in %d iter, error: %e\n", k, errorL2);
     // Compute output composition
     M1 = 1.0/n;
     for (s=0; s<nsp; s++) X1[s] = M1*ns[s];
@@ -253,7 +256,7 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     free(ns);
     free(bi0);
     free(dlnns);
-    return 0;
+    return errorcode;
 }
 
 #ifdef TEST
