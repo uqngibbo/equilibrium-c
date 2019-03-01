@@ -10,7 +10,8 @@ import std.file;
 import std.conv;
 import std.algorithm: canFind, countUntil;
 import std.algorithm.sorting: sort;
-import std.range: enumerate;
+import std.range: enumerate, take;
+import ceq;
 
 const string DBPATH = "./test.inp";
 
@@ -44,11 +45,8 @@ int readdb(string species, ref string[] lewisdata){
     nlines = nentries*3+1;
 
     // Now compilte them into a dynamic array, including the "nextline" from above
-    i=0;
-    foreach(line; fiter){
-       if (i==nlines) break;
-       lewisdata ~= to!string(nextline);
-       i++;
+    foreach(line; fiter.take(nlines)){
+       lewisdata ~= to!string(line);
     }
     return 0;
 }
@@ -65,23 +63,22 @@ double species_molecular_mass(string[] lewisdata){
 
     auto words = lewisdata[0].split();
     M = to!double(words[$-2]);
-    M /= 1000.0;
+    M /= 1000.0; // Change to gram-moles, (or regular moles...)
     return M;
 }
 
-void species_elements(string[] lewisdata, ref double[string] elements){
+void species_elements_from_lewisdata(string[] lewisdata, ref double[string] elements){
     /*
     Get the number of each element in a species from its lewis table data
     Inputs: 
         lewisdata : array of strings representing each line of the database entry 
     Outputs:
-        elements : associative array (dict) of element types (should be blank)
+        elements : associative array (dict) of element types (should start empty)
     */
     if (elements.length!=0) throw new Exception("elements.length!=0");
-    int i,n,s,e;
+    int i,s,e;
     double nel;
     string element,entry;
-    n = 1;
     
     for (i=0; i<5; i++){
         s = 10+8*i;
@@ -101,7 +98,7 @@ void species_elements(string[] lewisdata, ref double[string] elements){
 
 void species_thermo_coefficients(string[] lewisdata, ref double[] thermo_coefficients){
     /*
-    Get the number of each element in a species from its lewis table data
+    Get the numbers representing thermodynamic property curve fits from the lewis table data
     Inputs: 
         lewisdata : array of strings representing each line of the database entry 
     Outputs:
@@ -133,19 +130,14 @@ void species_thermo_coefficients(string[] lewisdata, ref double[] thermo_coeffic
     return;
 }
 
-// TODO: Make a separate function to get "elements" and sort it
-void compute_element_matrix(string[] speciesList, double[string][] elements_array, ref double[] a){
+void compile_element_set(double[string][] elements_array, ref string[] elements){
     /*
-    Get the number of each element in a species from its lewis table data
+    Get an alphabetical list of all the elements in the complete set of species
     Inputs: 
-         speciesList : array of strings of each species
          elements_array : array of associative arrays mapping species to elements
     Outputs:
-        a : element_matrix mapping species to elemental composition (Return the element list too?)
+        elements : list of elements in the entire system
     */
-    ulong nsp,nel,j;
-    string[] elements;
-    string el;
 
     foreach(e; elements_array){
         foreach(key; e.keys()){
@@ -153,6 +145,20 @@ void compute_element_matrix(string[] speciesList, double[string][] elements_arra
         }
     }
     elements.sort();
+    return;
+}
+
+void compile_element_matrix(string[] speciesList, double[string][] elements_array, string[] elements,
+                            ref double[] a){
+    /*
+    Get the number of each element in a species from its lewis table data
+    Inputs: 
+         speciesList : array of strings of each species
+         elements_array : array of associative arrays mapping species to elements
+    Outputs:
+        a : element_matrix mapping species to elemental composition 
+    */
+    ulong nsp,nel,j;
 
     nsp = speciesList.length;
     nel = elements.length; 
@@ -168,18 +174,59 @@ void compute_element_matrix(string[] speciesList, double[string][] elements_arra
     return;
 }
 
+void startup(string[] speciesList,
+             ref string[] element_set, ref double[] lewiscoeffs, ref double[string][] element_map,
+             ref double[] a, ref double[] M){
+    /*
+    Entry point function for equilibrium chemistry simulations
+    Inputs: 
+         speciesList : array of strings of each species
+    Outputs:
+        element_set : array of elements in the complete chemical system
+        lewiscoeffs : numbers for computing thermodynamic data from lewis tables
+        element_map : array of associative arrays mapping species to elements
+        a : element_matrix mapping species to elemental composition 
+        M : array of molecular weights
+    */
+    string[] species_lewisdata;
+    double[] species_lewiscoeffs;
+    double[string] species_elements;
+
+    foreach(species; speciesList){
+        species_lewisdata.length=0;
+        species_lewiscoeffs.length=0;
+        species_elements.clear();
+
+        readdb(species, species_lewisdata);
+
+        M ~= species_molecular_mass(species_lewisdata); 
+
+        species_elements_from_lewisdata(species_lewisdata, species_elements);
+        element_map ~= species_elements.dup();
+
+        species_thermo_coefficients(species_lewisdata, species_lewiscoeffs);
+        if (species_lewiscoeffs.length==18) species_lewiscoeffs ~= species_lewiscoeffs[9..18]; 
+        lewiscoeffs ~= species_lewiscoeffs.dup();
+    }
+
+    compile_element_set(element_map, element_set);
+    compile_element_matrix(speciesList, element_map, element_set, a);
+    return;
+}
+
 int main(string[] args){
-    int nsp,i,s,e;
+    int nsp,nel,code;
     double[] Xs0;
     double[] Xst;
+    double[] Xs1;
     double[] M;
     string[] speciesList;
-    string[] lewisdata;
+    string[] element_set;
     double[] lewiscoeffs;
-    double[] lewiscoeffs_array;
     double[] a;
-    double[string] elements;
-    double[string][] elements_array;
+    double[string][] element_map;
+
+    double u1,T1,p1;
 
     nsp = 3;
     speciesList.length = nsp;
@@ -190,29 +237,36 @@ int main(string[] args){
     Xs0.length = nsp; 
     Xs0[0] = 1.0;
     Xs0[1] = 0.0;
-    Xs0[0] = 0.0;
+    Xs0[2] = 0.0;
 
     Xst.length = nsp; 
     Xst[0] = 0.66108962603325838;
     Xst[1] = 0.22594024931116111;
-    Xst[0] = 0.11297012465558055;
+    Xst[2] = 0.11297012465558055;
 
-    for (i=0; i<nsp; i++){
-        lewisdata.length=0;
-        lewiscoeffs.length=0;
-        elements.clear();
+    Xs1.length = nsp;
+    Xs1[] = 0.0;
 
-        readdb(speciesList[i], lewisdata);
+    startup(speciesList, element_set, lewiscoeffs, element_map, a, M);
+    nel = to!int(element_set.length);
 
-        M ~= species_molecular_mass(lewisdata); 
-        species_elements(lewisdata, elements);
-        elements_array ~= elements.dup();
-        species_thermo_coefficients(lewisdata, lewiscoeffs);
-        if (lewiscoeffs.length==18) lewiscoeffs ~= lewiscoeffs[9..18]; //safety catch for nlines=2
-        lewiscoeffs_array ~= lewiscoeffs.dup();
-    }
-    compute_element_matrix(speciesList, elements_array, a);
+    writeln("elements", element_set);
+    writeln("lewiscoeffs", lewiscoeffs);
+    writeln("element_map", element_map);
     writeln("a", a);
+    writeln("M", M);
+
+    T1 = 2500.0;
+    u1 = 0.0;
+    p1= 0.1*101.35e3;
+
+    u1 = get_u(T1, Xst.ptr, nsp, lewiscoeffs.ptr, M.ptr);
+    writeln("testu: ", u1);
+
+    code = pt(p1,T1,Xs0.ptr,nsp,nel,lewiscoeffs.ptr,M.ptr,a.ptr,Xs1.ptr,1);
+    writeln("Done pt: ", code);
+    writeln("Xs1: ", Xs1);
+    writeln("Xst: ", Xst);
 
     return 0;
 }

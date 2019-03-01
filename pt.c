@@ -66,7 +66,7 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
         nss += ns[j];
         nsmus += ns[j]*mus_RTj;
     }
-    A[nel*neq + 0]  = nss - n;
+    A[nel*neq + 0]  = nss - n; // Yes, this is a problem. Shieeeeeet.
     B[nel] = n - nss + nsmus;
 
     //for (i=0; i<neq; i++){

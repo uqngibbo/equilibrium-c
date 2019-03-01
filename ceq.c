@@ -82,6 +82,7 @@ double get_u(double T, double* X, int nsp, double* lewis, double* M){
     double Mmix, u, ns, U0_RTs;
     double* lp;
 
+    printf("Inside get_u!: %f %f %d %f %f\n", T, X[0], nsp, lewis[0], M[0]);
     Mmix = 0.0; for (s=0; s<nsp; s++) Mmix+=X[s]*M[s];
     
     u = 0.0;
@@ -90,6 +91,7 @@ double get_u(double T, double* X, int nsp, double* lewis, double* M){
         lp = lewis + 9*3*s;
         U0_RTs = compute_H0_RT(T, lp) - 1.0;
         u += ns*U0_RTs*Ru*T;
+        printf("Mmix!: %f %f %f\n", Mmix, X[s], M[s]);
     }
     return u;
 }
@@ -197,7 +199,9 @@ int batch_u(int N, double* T, double* X, int nsp, double* lewis, double* M, doub
     return 0;
 }
 
+/*
 int main(){
     printf("Called main in ceq.c!\n");
     return 0;
 }
+*/
