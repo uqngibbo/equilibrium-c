@@ -59,6 +59,7 @@ if __name__=='__main__':
     linestyles = ['-','--']
     markers = ['o','v']
     lines = []
+    lib = load_ceq_library()
 
     for i,p in enumerate(ps):
         print("p",p)
@@ -66,7 +67,7 @@ if __name__=='__main__':
         pi[:] = p
         Xs0i = zeros((Ts.size, Xs0.size))
         Xs0i[:,:] = Xs0
-        Xs1i = batch_pt(pi, Ts, Xs0i, nsp, nel, lewisdata, M, a)
+        Xs1i = batch_pt(lib, pi, Ts, Xs0i, nsp, nel, lewisdata, M, a)
 
         icea = list(range(0,50,int(50/3)-1))
         Tcea = Ts[icea]

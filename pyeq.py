@@ -102,9 +102,10 @@ def startup(spnames):
     print("a",a.flatten())
     return elements, nsp, nel, lewisdata, a, M
 
-def load_library():
+def load_ceq_library():
     """ Load the c library and set return types """
     lib = cdll.LoadLibrary('./libceq.so')
+    lib.compute_Cp0_R.restype = c_double
     lib.pt.restype = c_int
     lib.rhou.restype = c_int
     lib.get_u.restype = c_double
@@ -113,7 +114,7 @@ def load_library():
     lib.batch_u.restype = c_int
     return lib
 
-def pt(p, T, Xs0, nsp, nel, lewis, M, a,verbose=0):
+def pt(lib, p, T, Xs0, nsp, nel, lewis, M, a,verbose=0):
     """ Call c library to compute equilibrium concentrations at fixed p, T """
     Xs1 = zeros(Xs0.shape)
     pp = c_double(p)
@@ -126,11 +127,10 @@ def pt(p, T, Xs0, nsp, nel, lewis, M, a,verbose=0):
     ap    = a.ctypes.data_as(c_double_p)
     Xs1p  = Xs1.ctypes.data_as(c_double_p)
 
-    lib = load_library()
     recode = lib.pt(pp, Tp, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p, verbose)
     return Xs1
 
-def rhou(rho, u, Xs0, nsp, nel, lewis, M, a,verbose=0):
+def rhou(lib, rho, u, Xs0, nsp, nel, lewis, M, a,verbose=0):
     """ Call c library to compute equilibrium concentrations at fixed rho, u """
     Xs1 = zeros(Xs0.shape)
     rhop = c_double(rho)
@@ -145,12 +145,11 @@ def rhou(rho, u, Xs0, nsp, nel, lewis, M, a,verbose=0):
     ap    = a.ctypes.data_as(c_double_p)
     Xs1p  = Xs1.ctypes.data_as(c_double_p)
 
-    lib = load_library()
     recode = lib.rhou(rhop, up, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p, Tref, verbose)
     T = Tp.value
     return Xs1, T
 
-def get_u(T, X, nsp, lewis, M):
+def get_u(lib, T, X, nsp, lewis, M):
     """ Call c library to compute internal energy at fixed composition and temperature """
     Tp = c_double(T)
 
@@ -159,11 +158,10 @@ def get_u(T, X, nsp, lewis, M):
     Mp    = M.ctypes.data_as(c_double_p)
     lewisp= lewis.ctypes.data_as(c_double_p)
 
-    lib = load_library()
     u = lib.get_u(Tp, Xp, nsp, lewisp, Mp)
     return u
 
-def batch_pt(p, T, Xs0, nsp, nel, lewis, M, a,verbose=0):
+def batch_pt(lib, p, T, Xs0, nsp, nel, lewis, M, a,verbose=0):
     """ Call c library to compute equilibrium concentrations at fixed p, T """
     N, nspcheck = Xs0.shape
     if nspcheck!=nsp: raise Exception("nsp ({}) != Xs0.shape[1] ({})".format(nsp, nspcheck))
@@ -181,11 +179,10 @@ def batch_pt(p, T, Xs0, nsp, nel, lewis, M, a,verbose=0):
     ap    = a.ctypes.data_as(c_double_p)
     Xs1p  = Xs1.ctypes.data_as(c_double_p)
 
-    lib = load_library()
     recode = lib.batch_pt(N, pp, Tp, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p, verbose)
     return Xs1
 
-def batch_rhou(rho, u, Xs0, nsp, nel, lewis, M, a,verbose=0):
+def batch_rhou(lib, rho, u, Xs0, nsp, nel, lewis, M, a,verbose=0):
     """ Call c library to compute equilibrium concentrations at fixed rho, u """
     N, nspcheck = Xs0.shape
     if nspcheck!=nsp: raise Exception("nsp ({}) != Xs0.shape[1] ({})".format(nsp, nspcheck))
@@ -205,7 +202,6 @@ def batch_rhou(rho, u, Xs0, nsp, nel, lewis, M, a,verbose=0):
     ap    = a.ctypes.data_as(c_double_p)
     Xs1p  = Xs1.ctypes.data_as(c_double_p)
 
-    lib = load_library()
     recode = lib.batch_rhou(N, rhop, up, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p, Tp, verbose)
     return Xs1, T
 

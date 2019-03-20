@@ -14,9 +14,10 @@ def test_pt():
     Xs0 = array([1.0, 0.0, 0.0])
     Xst = array([0.66108962603325838,0.22594024931116111,0.11297012465558055])
     elements, nsp, nel, lewisdata, a, M = startup(spnames)
+    lib = load_ceq_library()
 
     print("Computing")
-    Xs1 = pt(p, T, Xs0, nsp, nel, lewisdata, M, a, 1)
+    Xs1 = pt(lib, p, T, Xs0, nsp, nel, lewisdata, M, a, 1)
     print("Done: ", Xs1)
     print("Target: ", Xst)
     return
@@ -28,6 +29,7 @@ def test_rhou():
     Xs0 = array([1.0, 0.0, 0.0])
     Xst = array([0.66108962603325838,0.22594024931116111,0.11297012465558055])
     elements, nsp, nel, lewisdata, a, M = startup(spnames)
+    lib = load_ceq_library()
 
     Ru = 8.3144598 # uses gram-moles, or regular moles... to match M in lewis_library
     Mt = sum(Xst*M)
@@ -41,14 +43,14 @@ def test_rhou():
     #species = [get_species(sp) for sp in spnames]
     #U0st= [(sp.H0onRT(T) - 1.0)*Ru*T for sp in species]
     #ut = sum(njt*U0jt for njt,U0jt in zip(nst,U0st))
-    ut = get_u(T, Xst, nsp, lewisdata, M)
+    ut = get_u(lib, T, Xst, nsp, lewisdata, M)
 
     print("a",a.flatten())
     print("ut",ut)
     print("nst",nst)
     print("rhot",rhot)
     print("Computing")
-    Xs1, Teq = rhou(rhot, ut, Xs0, nsp, nel, lewisdata, M, a, 1)
+    Xs1, Teq = rhou(lib, rhot, ut, Xs0, nsp, nel, lewisdata, M, a, 1)
     print("Done X: ", Xs1)
     print("Target: ", Xst)
     print("Done T: ", T)

@@ -82,7 +82,6 @@ double get_u(double T, double* X, int nsp, double* lewis, double* M){
     double Mmix, u, ns, U0_RTs;
     double* lp;
 
-    printf("Inside get_u!: %f %f %d %f %f\n", T, X[0], nsp, lewis[0], M[0]);
     Mmix = 0.0; for (s=0; s<nsp; s++) Mmix+=X[s]*M[s];
     
     u = 0.0;
@@ -91,9 +90,38 @@ double get_u(double T, double* X, int nsp, double* lewis, double* M){
         lp = lewis + 9*3*s;
         U0_RTs = compute_H0_RT(T, lp) - 1.0;
         u += ns*U0_RTs*Ru*T;
-        printf("Mmix!: %f %f %f\n", Mmix, X[s], M[s]);
     }
     return u;
+}
+
+double get_cp(double T, double* X, int nsp, double* lewis, double* M){
+    /*
+    Compute thermal equilibrium cp from known composition and primitives
+    Inputs:
+        T     : Temperature (K)
+        X     : Composition [nsp]
+        nsp   : number of species 
+        lewis : Nasa Lewis Thermodynamic Database Data [nsp*3*9]
+        M     : Molar Mass of each species (kg/mol) [nsp]
+        verbose: print debugging information
+
+    Output:
+        cp : specific heat at constant pressure per unit mass
+    */
+    int s;
+    double Mmix, ns, cp,Cp0_Rs;
+    double* lp;
+
+    Mmix = 0.0; for (s=0; s<nsp; s++) Mmix+=X[s]*M[s];
+    
+    cp = 0.0;
+    for (s=0; s<nsp; s++){
+        ns = X[s]/Mmix;
+        lp = lewis + 9*3*s;
+        Cp0_Rs = compute_Cp0_R(T, lp);
+        cp += ns*Cp0_Rs*Ru;
+    }
+    return cp;
 }
 
 int batch_pt(int N, double* p,double* T,double* X0,int nsp,int nel,double* lewis,double* M,double* a,
