@@ -57,7 +57,7 @@ double species_molecular_mass(string[] lewisdata){
     Inputs: 
         lewisdata : array of strings representing each line of the database entry 
     Outputs:
-        M : molecular mass in kg/mol (that's kmols, unlike in the lewis database, which uses gmols)
+        M : molecular mass in kg/mol (that's gmols, unlike in the lewis database, which uses kmols)
     */
     double M;
 
