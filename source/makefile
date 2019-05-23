@@ -1,5 +1,4 @@
 CC ?= gcc
-DMD ?= dmd
 CFLAGS := -I. -fPIC
 INSTALL_DIR=/home/qungibbo/programs/ceq
 
@@ -22,9 +21,6 @@ ceq.o: ceq.c thermo.h rhou.h pt.h ceq.h
 ceq: thermo.o linalg.o pt.o rhou.o ceq.o
 	$(CC) $(CFLAGS) -shared thermo.o linalg.o pt.o rhou.o ceq.o -lm -o libceq.so
 
-deq: thermo.o linalg.o pt.o rhou.o ceq.o
-	$(DMD) deq.d thermo.o linalg.o pt.o rhou.o ceq.o
-
 
 install: 
 	cp libceq.so $(INSTALL_DIR)
@@ -40,5 +36,4 @@ moduletests: thermo.o linalg.o
 
 clean: 
 	rm -rf *.o 
-	rm -rf deq
 	rm -rf libceq.so
