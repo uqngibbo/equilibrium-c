@@ -60,6 +60,8 @@ void solve_matrix(double* A, double* B, double *X, int N){
         B[i] -= a*B[k];
     }
     k++;
+    } // end while loop for row reduction
+
     //for (i=0; i<N; i++) {
     //    printf("[");
     //    for (j=0; j<N; j++){
@@ -68,8 +70,6 @@ void solve_matrix(double* A, double* B, double *X, int N){
     //    printf("]\n");
     //}
     //printf("\n");
-
-    } // end while loop for row reduction
 
     // Now compute X using back substitution
     for (k=N-1; k>=0; k--){

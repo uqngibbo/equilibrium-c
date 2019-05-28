@@ -29,6 +29,7 @@ install:
 	cp pyeq2.py $(INSTALL_DIR)/pyeq.py
 	rm -rf pyeq1.py pyeq2.py
 	cp '../thermo.inp' $(INSTALL_DIR)
+	cp -r ../tests $(INSTALL_DIR)
 
 moduletests: thermo.o linalg.o
 	$(CC) thermo.c -D TEST -lm -o testthermo
