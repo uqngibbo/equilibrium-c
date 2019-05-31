@@ -19,12 +19,14 @@ import std.algorithm: canFind, countUntil;
 import std.algorithm.sorting: sort;
 import std.range: enumerate, take;
 import nm.number;
-import ceq;
-
+import nm.bbla;
+import gas.thermo.cea_thermo_curves;
 import gas.gas_model;
 import gas.gas_state;
 
 const string DBPATH = "/home/qungibbo/programs/ceq/thermo.inp";
+const double Ru=8.3144621;      // Universal Gas Constant (J/mol/K)
+const double TRACELIMIT=1e-7;   // Trace species limiter (for ns/n)
 
 class EqGas: GasModel {
 public:
@@ -68,18 +70,30 @@ public:
         nel = to!int(element_set.length);
         nsp = to!int(speciesList.length);
         _mol_masses.length = nsp;
-        _mol_masses = M; 
+        _mol_masses = M;  // FIXME: this could be a problem, put the calc in the getter ??
         X0.length = nsp; X1.length = nsp;
 
-        int neq= nel+1;
-        A_.length      = neq*neq; // Iteration Jacobian
-        B_.length      = neq;     // Iteration RHS
-        S_.length      = neq;     // Iteration unknown vector
-        G0_RTs_.length = nsp;     // Species Gibbs Free Energy
-        ns_.length     = nsp;     // Species moles/mixture mass
-        bi0_.length    = nel;     // starting composition coefficients
-        dlnns_.length  = nsp;     // starting composition coefficients
+        neq= nel+1;
+        S.length      = neq;     // Iteration unknown vector
+        G0_RTs.length = nsp;     // Species Gibbs Free Energy
+        ns.length     = nsp;     // Species moles/mixture mass
+        bi0.length    = nel;     // starting composition coefficients
+        dlnns.length  = nsp;     // starting composition coefficients
+        AB = new Matrix!double(neq, neq+1);
         
+        // FIXME: eventually this will be moved to the other constructor and not have a hardcoded name
+        auto L = init_lua_State();
+        doLuaFile(L, "sample-data/co2_test.lua");
+        foreach ( isp; 0..nsp ) {
+            lua_getglobal(L, "db");
+            lua_getfield(L, -1, speciesList[isp].toStringz);
+            lua_getfield(L, -1, "thermoCoeffs");
+            _curves ~= createCEAThermo(L, Ru/M[isp]);
+            lua_pop(L, 1);
+            lua_pop(L, 1);
+            lua_pop(L, 1);
+        }
+
         // TODO you need viscous properties setup here. 
     } // End Basic contructor
 
@@ -102,14 +116,12 @@ public:
         return "EqGas(species=[TODO])";
     }
 
-    // Problems, these methods can't allocate their own memory, and do not like
-    // being given X0 X1 from somewhere else
     override void update_thermo_from_pT(GasState Q) 
     {
         int error;
 
         massf2molef(Q, X0); 
-        error = solve_pt(Q.p,Q.T,X0.ptr,nsp,nel,lewiscoeffs.ptr,M.ptr,a.ptr,X1.ptr,1);
+        error = solve_pt(Q.p,Q.T,X0,M,a,X1,1);
         molef2massf(X1, Q);
         // Set everything else in Q that isn't p,t 
 
@@ -190,7 +202,7 @@ public:
     @nogc @property override uint gasstate_n_species() const { return nsp; }
 
 private:
-    int nel, nsp;
+    int nel, nsp, neq;
     string[] species_list;
     string[] element_set;
     double[] lewiscoeffs;
@@ -198,7 +210,9 @@ private:
     double[] a;
     double[] M;
     double[] X0,X1;
-    double[] A_, B_, S_, G0_RTs_, ns_, bi0_, dlnns_; // Dynamic arrays
+    double[] S, G0_RTs, ns, bi0, dlnns; // Dynamic arrays
+    Matrix!double AB;
+    CEAThermo[] _curves;
 
     int readdb(string species, ref string[] lewisdata){
         /* 
@@ -359,29 +373,30 @@ private:
         return;
     }
 
-    @nogc void pt_Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,double* ns,double n,
-                              int nsp,int nel,double* A, double* B){
+    @nogc void pt_Assemble_Matrix(double[] a,double[] bi0,double[] G0_RTs,double p,double[] ns,double n,
+                                  ref Matrix!double AB){
         /*
         Construct Iteration Matrix for reduced Newton Rhapson step, (eqn 2.24 and 2.26 from cea_I)
         */
         double lnns, lnn, lnp, akjaijnj, akjnjmuj, mus_RTj, bk;
         double nss, nsmus;
-        int k,neq,i,j,s;
-        neq = nel+1;
+        int k,i,j,s;
         lnn = log(n);
         lnp = log(p/1e5); // Standard pressure for the tables is one BAR
     
         // Equation 2.24: k-> equation index, i-> variable index
         for (k=0; k<nel; k++){
             bk = 0.0; for (s=0; s<nsp; s++) bk += a[k*nsp + s]*ns[s];
-            A[k*neq + 0] = bk;
+            //A[k*neq + 0] = bk;
+            AB[k,0] = bk;
     
             for (i=0; i<nel; i++){
                 akjaijnj = 0.0;
                 for (j=0; j<nsp; j++){
                     akjaijnj += a[k*nsp+j]*a[i*nsp+j]*ns[j];
                 }
-                A[k*neq + i+1] = akjaijnj;
+                //A[k*neq + i+1] = akjaijnj;
+                AB[k,i+1] = akjaijnj;
             }
             akjnjmuj = 0.0;
             for (j=0; j<nsp; j++){
@@ -390,10 +405,12 @@ private:
                 akjnjmuj += a[k*nsp+j]*ns[j]*mus_RTj;
     
             }
-            B[k] = bi0[k] - bk + akjnjmuj;
+            //B[k] = bi0[k] - bk + akjnjmuj;
+            AB[k,neq] = bi0[k] - bk + akjnjmuj;
     
             // Equation 2.26 - > (only the pii entries, we're highjacking k here to go across the last row)
-            A[nel*neq + k+1] = bk;
+            //A[nel*neq + k+1] = bk;
+            AB[nel,k+1] = bk;
         }
         // Equation 2.26 - > (now the rest)
         nss = 0.0;
@@ -404,20 +421,22 @@ private:
             nss += ns[j];
             nsmus += ns[j]*mus_RTj;
         }
-        A[nel*neq + 0]  = nss - n; // Yes, this is a problem. Shieeeeeet.
-        B[nel] = n - nss + nsmus;
+        //A[nel*neq + 0]  = nss - n; // Yes, this is a problem. Shieeeeeet.
+        //B[nel] = n - nss + nsmus;
+        AB[nel,0]  = nss - n; 
+        AB[nel,neq] = n - nss + nsmus;
     
         //for (i=0; i<neq; i++){
         //    for (j=0; j<neq; j++){
-        //        printf("%f ", A[i*neq+j]);
+        //        printf("%f ", AB[i,j]);
         //    }
-        //    printf("| %f\n", B[i]);
+        //    printf("| %f\n", AB[i,neq]);
         //}
         return;
     }
-    
-    @nogc void pt_species_corrections(double* S,double* a,double* G0_RTs,double p,double n,double* ns,
-                            int nsp, int nel, double* dlnns){
+
+    @nogc void pt_species_corrections(double[] S,double[] a,double[] G0_RTs,double p,double n,
+                                       double[] ns, ref double[] dlnns){
         /*
         Compute delta_log(ns) from the reduced iteration equations from 
         equation 2.18m using the other deltas in S
@@ -449,12 +468,11 @@ private:
                 aispii += a[i*nsp+s]*S[i+1]; // S[i+1] = pi_i, the lagrange multiplier
             }
             dlnns[s] = -mu_RTs + dlnn + aispii;
-            //printf("dllns[%d] %f %f %f (%f) %f\n",s,-mu_RTs, dlnn, aispii, dlnns[s], lnn);
         }
         return; 
     }
-    
-    @nogc void pt_update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* n){
+
+    @nogc void pt_update_unknowns(double[] S,double[] dlnns,ref double[] ns, ref double n){
         /*
         Add corrections to unknown values (ignoring lagrange multipliers)
         Inputs:
@@ -468,10 +486,10 @@ private:
         int s;
         double lnns,lnn,n_copy,lambda;
     
-        lnn = log(*n); // compute the log of the thing n is pointing to
+        lnn = log(n); 
         lambda = fmin(1.0, 0.5*fabs(lnn)/fabs(S[0]));
         n_copy = exp(lnn + lambda*S[0]); 
-        *n = n_copy;   // thing pointed to by n set to exp(lnn + S[0]);
+        n = n_copy;   // thing pointed to by n set to exp(lnn + S[0]);
     
         for (s=0; s<nsp; s++){
             if (ns[s]==0.0) continue;
@@ -486,7 +504,8 @@ private:
         return;
     }
     
-    @nogc int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* M,double* a,double* X1,int verbose){
+    // TODO: Change io variables from mole to mass fractions maybe?
+    @nogc int solve_pt(double p,double T,double[] X0,double[] M,double[] a,ref double[] X1,int verbose){
         /*
         Compute the equilibrium composition X1 at a fixed temperature and pressure
         Inputs:
@@ -503,24 +522,13 @@ private:
         Output:
             X1 : Equilibrium Mole Fraction [nsp]  
         */
-        double* A, B, S, G0_RTs, ns, bi0, dlnns; // Pointers to preserve c mechanics
-        double* lp;
-        int neq,s,i,k,ntrace,errorcode;
-        double M0,n,M1,errorL2,thing;
+        int s,i,j,k,ntrace,errorcode;
+        double M0,n,M1,errorL2,thing,Rs;
     
         const double tol=1e-6;
         const int attempts=30;
     
         errorcode=0;
-    
-        neq = nel+1;
-        A      = A_.ptr;
-        B      = B_.ptr;
-        S      = S_.ptr;
-        G0_RTs = G0_RTs_.ptr;
-        ns     = ns_.ptr;
-        bi0    = bi0_.ptr;
-        dlnns  = dlnns_.ptr;
     
         // Initialise Arrays and Iteration Guesses
         M0 = 0.0;
@@ -537,16 +545,20 @@ private:
         n*=1.1;
     
         for (s=0; s<nsp; s++){
-            lp = lewis + 9*3*s;
-            G0_RTs[s] = compute_G0_RT(T, lp);
+            Rs = Ru/M[s];
+            auto c = _curves[s];
+            G0_RTs[s] = c.eval_h(T)/Rs/T - c.eval_s(T)/Rs;
         }
+
         // Main Iteration Loop: 
         for (k=0; k<=attempts; k++){
             // 1: Perform an update of the equations
-            pt_Assemble_Matrices(a, bi0, G0_RTs, p, ns, n, nsp, nel, A, B);
-            solve_matrix(A, B, S, neq);
-            pt_species_corrections(S, a, G0_RTs, p, n, ns, nsp, nel, dlnns);
-            pt_update_unknowns(S, dlnns, nsp, ns, &n);
+            pt_Assemble_Matrix(a, bi0, G0_RTs, p, ns, n, AB);
+            gaussJordanElimination(AB);
+            
+            for (j=0; j<neq; j++) S[j] = AB[j,neq];
+            pt_species_corrections(S, a, G0_RTs, p, n, ns, dlnns);
+            pt_update_unknowns(S, dlnns, ns, n);
     
             // Compute remaining error by checking species corrections
             errorL2 = 0.0;
