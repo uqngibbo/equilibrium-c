@@ -14,7 +14,6 @@ import std.string;
 import std.conv : to;
 import util.lua;
 import util.lua_service;
-import std.file;
 import std.algorithm: canFind, countUntil;
 import std.algorithm.sorting: sort;
 import std.range: enumerate, take;
@@ -23,54 +22,63 @@ import nm.bbla;
 import gas.thermo.cea_thermo_curves;
 import gas.gas_model;
 import gas.gas_state;
+import gas.therm_perf_gas;
 
 const string DBPATH = "/home/qungibbo/programs/ceq/thermo.inp";
 const double Ru=8.3144621;      // Universal Gas Constant (J/mol/K)
 const double TRACELIMIT=1e-7;   // Trace species limiter (for ns/n)
 
-class EqGas: GasModel {
+class EqGas: ThermallyPerfectGas {
 public:
-    this(string mixtureName, string[] speciesList){
-        version(complex_numbers) {
-            throw new Error("Do not use with complex numbers.");
-        }
+    this(lua_State* L) {
+        super(L);
 
         // We're going to trick the flow solver into thinking that we have only one species
-        _n_modes = 0;
+        nsp = to!int(_n_species);
+        species_list.length = nsp;
+        M.length = nsp;
+        species_list = _species_names.dup();
+        M = _mol_masses.dup();
+
         _n_species = 1;
         _species_names.length =  _n_species;
-        _species_names[0] = mixtureName;
+        _species_names[0] = "mixture";
 
-        // Now set up our own secret variables
-        string[] species_lewisdata;
-        double[] species_lewiscoeffs;
         double[string] species_elements;
+        double[string][] element_map;
+        string[] element_set;
 
-        foreach(species; speciesList){
-            species_lewisdata.length=0;
-            species_lewiscoeffs.length=0;
+        foreach(species; species_list){
             species_elements.clear();
+            lua_getglobal(L, "db");
+            lua_getfield(L, -1, species.toStringz);
+            lua_getfield(L, -1, "atomicConstituents");
 
-            species_list ~= species;
-            readdb(species, species_lewisdata);
-
-            M ~= species_molecular_mass(species_lewisdata); 
-
-            species_elements_from_lewisdata(species_lewisdata, species_elements);
+            // This is some of the most confusing shit I have ever encountered in my entire life
+            // Why does this completely idiomatic operation take TEN lines ...
+            // Why do I have to micromanage the key numbers in weird inconsistent ways
+            // Why does lua next automatically mess with the stack....
+            // WHYYYYYYYYYYYYY
+            lua_pushnil(L); // dummy first key
+            while (lua_next(L, -2) != 0) { // -1 is the dummy key, -2 is the atomicConstituents table
+                // lua_next removes the dummy key and puts the first key value pair on the stack
+                // the key at -2, value at -1
+                string key = to!string(lua_tostring(L, -2));
+                int value = to!int(lua_tointeger(L, -1));
+                species_elements[key] = to!double(value);
+                lua_pop(L, 1); // discard value but keep key so that lua_next can remove it (WHY?!)
+            }
+            lua_pop(L, 1); // remove atomicConstituents (lua_next removed the key when it broke loop)
+            lua_pop(L, 1); // remove species table
+            lua_pop(L, 1); // remove db table
             element_map ~= species_elements.dup();
 
-            species_thermo_coefficients(species_lewisdata, species_lewiscoeffs);
-            if (species_lewiscoeffs.length==18) species_lewiscoeffs ~= species_lewiscoeffs[9..18]; 
-            lewiscoeffs ~= species_lewiscoeffs.dup();
         }
 
         compile_element_set(element_map, element_set);
-        compile_element_matrix(speciesList, element_map, element_set, a);
+        compile_element_matrix(species_list, element_map, element_set, a);
 
         nel = to!int(element_set.length);
-        nsp = to!int(speciesList.length);
-        _mol_masses.length = nsp;
-        _mol_masses = M;  // FIXME: this could be a problem, put the calc in the getter ??
         X0.length = nsp; X1.length = nsp;
 
         neq= nel+1;
@@ -81,35 +89,15 @@ public:
         dlnns.length  = nsp;     // starting composition coefficients
         AB = new Matrix!double(neq, neq+1);
         
-        // FIXME: eventually this will be moved to the other constructor and not have a hardcoded name
+    } // End Lua state contructor
+
+    this(in string fname)
+    {
         auto L = init_lua_State();
-        doLuaFile(L, "sample-data/co2_test.lua");
-        foreach ( isp; 0..nsp ) {
-            lua_getglobal(L, "db");
-            lua_getfield(L, -1, speciesList[isp].toStringz);
-            lua_getfield(L, -1, "thermoCoeffs");
-            _curves ~= createCEAThermo(L, Ru/M[isp]);
-            lua_pop(L, 1);
-            lua_pop(L, 1);
-            lua_pop(L, 1);
-        }
-
-        // TODO you need viscous properties setup here. 
-    } // End Basic contructor
-
-
-    this(lua_State* L) {
-        lua_getglobal(L, "EqGas");
-
-        // getXXX functions automatically clear the LUA stack, reseting it to EQGas
-        string mixtureName = getString(L, -1, "mixtureName");
-
-        string[] speciesList;
-        getArrayOfStrings(L, -1, "speciesList", speciesList);
-
-        this(mixtureName, speciesList);
+        doLuaFile(L, fname);
+        this(L);
+        lua_close(L); // We no longer need the Lua interpreter.
     } // end constructor from a Lua file
-
 
     override string toString() const
     {
@@ -160,175 +148,18 @@ public:
     {
         throw new Exception("EqGas update_thermo_from_hs not implemented.");
     }
-    override void update_sound_speed(GasState Q) const
-    {
-        // FIXME
-
-    }
-    override void update_trans_coeffs(GasState Q)
-    {
-        // FIXME
-    }
-
-    override number dudT_const_v(in GasState Q) const
-    {
-        return to!number(Q.ceaSavedData.Cp - Q.ceaSavedData.Rgas);
-    }
-    override number dhdT_const_p(in GasState Q) const
-    {
-        return to!number(Q.ceaSavedData.Cp);
-    }
-    override number dpdrho_const_T(in GasState Q) const
-    {
-        return Q.ceaSavedData.Rgas * Q.T;
-    }
-    override number gas_constant(in GasState Q) const
-    {
-        return to!number(Q.ceaSavedData.Rgas);
-    }
-    override number internal_energy(in GasState Q) const
-    {
-        return Q.u;
-    }
-    override number enthalpy(in GasState Q) const
-    {
-        return to!number(Q.ceaSavedData.h);
-    }
-    override number entropy(in GasState Q) const
-    {
-        return to!number(Q.ceaSavedData.s);
-    }
 
     @nogc @property override uint gasstate_n_species() const { return nsp; }
 
 private:
     int nel, nsp, neq;
     string[] species_list;
-    string[] element_set;
-    double[] lewiscoeffs;
-    double[string][] element_map;
     double[] a;
     double[] M;
     double[] X0,X1;
     double[] S, G0_RTs, ns, bi0, dlnns; // Dynamic arrays
     Matrix!double AB;
-    CEAThermo[] _curves;
 
-    int readdb(string species, ref string[] lewisdata){
-        /* 
-        Read a species raw data from the lewis thermodynamic database.
-    
-        Inputs: 
-            species : species formula
-        Outputs:
-            lewisdata : array of strings representing each line of the database entry 
-        */ 
-        int i,nlines,nentries;
-        string sp_with_space = species ~ " ";
-        auto f = File(DBPATH);
-        auto fiter = f.byLine();
-        char[] nextline;
-        
-        if (lewisdata.length!=0) throw new Exception("lewisdata.length!=0");
-    
-        // Search through the file looking for 'species'
-        foreach(line; fiter) if (line.startsWith(sp_with_space)) break;
-    
-        // Check to see if we found it
-        if (f.eof()) throw new Exception("Species " ~ species ~ " not found!");
-    
-        // If we've arrived here we're just before the database entry, check how many entries
-        fiter.popFront();
-        nextline = fiter.front;
-        nentries = to!int(nextline.split()[0]);
-        nlines = nentries*3+1;
-    
-        // Now compilte them into a dynamic array, including the "nextline" from above
-        foreach(line; fiter.take(nlines)){
-           lewisdata ~= to!string(line);
-        }
-        return 0;
-    }
-    
-    double species_molecular_mass(string[] lewisdata){
-        /*
-        Get the molecular weight of a species from its lewis table data.
-        Inputs: 
-            lewisdata : array of strings representing each line of the database entry 
-        Outputs:
-            M : molecular mass in kg/mol (that's kmols, unlike in the lewis database, which uses gmols)
-        */
-        double M;
-    
-        auto words = lewisdata[0].split();
-        M = to!double(words[$-2]);
-        M /= 1000.0; // Change to gram-moles, (or regular moles...)
-        return M;
-    }
-    
-    void species_elements_from_lewisdata(string[] lewisdata, ref double[string] elements){
-        /*
-        Get the number of each element in a species from its lewis table data
-        Inputs: 
-            lewisdata : array of strings representing each line of the database entry 
-        Outputs:
-            elements : associative array (dict) of element types (should start empty)
-        */
-        if (elements.length!=0) throw new Exception("elements.length!=0");
-        int i,s,e;
-        double nel;
-        string element,entry;
-        
-        for (i=0; i<5; i++){
-            s = 10+8*i;
-            e = 10+8*(i+1);
-            entry = lewisdata[0][s..e];
-    
-            auto entrysplit = entry.split();
-            if (entrysplit.length!=2) continue;
-    
-            element = to!string(entrysplit[0]);
-            nel = to!double(entrysplit[1]);
-    
-            elements[element] = nel;
-        }
-        return;
-    }
-    
-    void species_thermo_coefficients(string[] lewisdata, ref double[] thermo_coefficients){
-        /*
-        Get the numbers representing thermodynamic property curve fits from the lewis table data
-        Inputs: 
-            lewisdata : array of strings representing each line of the database entry 
-        Outputs:
-            thermo_coefficients : numbers for computing thermodynamic data from lewis tables
-        */
-        if (thermo_coefficients.length!=0) throw new Exception("thermo_coefficients.length!=0");
-        int i,j,s,e,nentries,nlines;
-        string line,D,E;
-    
-        nlines = to!int(lewisdata.length);
-        nentries = (nlines-1)/3;
-    
-        for (i=0; i<nentries; i++){
-            line = lewisdata[2+3*i].replace("D","E"); // Fix Fortran Double nonsense
-            for (j=0; j<5; j++){
-                s = 16*j;
-                e = 16*(j+1);
-                thermo_coefficients ~= to!double(line[s..e].strip());
-            }
-    
-            line = lewisdata[2+3*i+1].replace("D","E"); // Fix Fortran Double nonsense
-            for (j=0; j<5; j++){
-                if (j==2) continue; // Skip blank entry
-                s = 16*j;
-                e = 16*(j+1);
-                thermo_coefficients ~= to!double(line[s..e].strip());
-            }
-        }
-        return;
-    }
-    
     void compile_element_set(double[string][] elements_array, ref string[] elements){
         /*
         Get an alphabetical list of all the elements in the complete set of species
@@ -612,7 +443,7 @@ version(eq_gas_test) {
         double[3] Y0 = [1.0, 0.0, 0.0];
         double[3] Xt = [0.66010397, 0.22659735, 0.11329868];
         double[3] Xf = [0.0, 0.0, 0.0];
-        auto gm = new EqGas("co2_eq", species);
+        auto gm = new EqGas("sample-data/co2_test.lua");
         auto Q = new GasState(3, 0);
         Q.massf = Y0;
         Q.p = 0.1*101.35e3;
