@@ -3,7 +3,10 @@
  * Equilibrium gas mixture based on ceq library
  *
  * Author: Nick Gibbons 
- * Notes: - Start
+ * Notes: - Solving works
+ *        - Consider integration with the rest code problems (_mol_masses in particular)
+ *        - Consider issues with small species getting "deadlocked" into Ys=0
+ *        - Consider OOP reimplementation if more solver modes are needed (rhoT etc)
  */
 
 module gas.eq_gas;
@@ -84,6 +87,8 @@ public:
         neq= nel+1;
         S.length      = neq;     // Iteration unknown vector
         G0_RTs.length = nsp;     // Species Gibbs Free Energy
+        U0_RTs.length = nsp;     // Species Internal Energys per mole
+        Cv0_Rs.length = nsp;     // Species Molar specific heat at constant volume
         ns.length     = nsp;     // Species moles/mixture mass
         bi0.length    = nel;     // starting composition coefficients
         dlnns.length  = nsp;     // starting composition coefficients
@@ -111,24 +116,17 @@ public:
         massf2molef(Q, X0); 
         error = solve_pt(Q.p,Q.T,X0,M,a,X1,1);
         molef2massf(X1, Q);
-        // Set everything else in Q that isn't p,t 
+        _pgMixEOS.update_density(Q);
+        _tpgMixEOS.update_energy(Q);
 
     }
     override void update_thermo_from_rhou(GasState Q)
     {
-        //int error;
-        //double* Tp;
-        //double Mmix;
-        //massf2molef(Q, X0); 
-        //error = solve_rhou(Q.rho,Q.u,X0.ptr,nsp,nel,lewiscoeffs.ptr,M.ptr,a.ptr,X1.ptr,Tp,0);
-
-        //// Set everything else in Q that isn't rho,u 
-        //molef2massf(X1, Q);
-        //Mmix = 0.0; for(int s; s<nsp; s++) Mmix += X1[s]*M[s];
-
-        //Q.T = *Tp;
-        //Q.p = Ru/Mmix*Q.rho*Q.T;
-        //Q.p_e = Q.p;
+        int error;
+        massf2molef(Q, X0); 
+        error = solve_rhou(Q.rho,Q.u,X0,M,a,X1,Q.T,1);
+        molef2massf(X1, Q);
+        _pgMixEOS.update_pressure(Q);
     }
 
     override void update_thermo_from_rhoT(GasState Q) const
@@ -157,7 +155,7 @@ private:
     double[] a;
     double[] M;
     double[] X0,X1;
-    double[] S, G0_RTs, ns, bi0, dlnns; // Dynamic arrays
+    double[] S, G0_RTs, U0_RTs, Cv0_Rs, ns, bi0, dlnns; 
     Matrix!double AB;
 
     void compile_element_set(double[string][] elements_array, ref string[] elements){
@@ -335,7 +333,6 @@ private:
         return;
     }
     
-    // TODO: Change io variables from mole to mass fractions maybe?
     @nogc int solve_pt(double p,double T,double[] X0,double[] M,double[] a,ref double[] X1,int verbose){
         /*
         Compute the equilibrium composition X1 at a fixed temperature and pressure
@@ -354,7 +351,7 @@ private:
             X1 : Equilibrium Mole Fraction [nsp]  
         */
         int s,i,j,k,ntrace,errorcode;
-        double M0,n,M1,errorL2,thing,Rs;
+        double M0,n,M1,errorL2,Rs;
     
         const double tol=1e-6;
         const int attempts=30;
@@ -434,6 +431,230 @@ private:
         return errorcode;
     }
 
+    @nogc void rhou_Assemble_Matrix(double[] a,double[] bi0, double rho0, double u0, double T,
+                                    double[] ns, double[] G0_RTs, double[] U0_RTs, double[] Cv0_Rs,
+                                    ref Matrix!double AB){
+        /*
+        Construct Iteration Matrix for reduced Newton Rhapson rhou step, (eqn 2.45 and 2.47 from cea_I)
+        */
+        double mus_RTj, bk, u, akjaijnj, akjnjmuj, akjnjUj, njCvj, njUj2, njUjmuj, aijnjUj, Rs, Hs_RT;
+        int k,i,j,s;
+    
+        u = 0.0;
+        for (s=0; s<nsp; s++){
+            Rs = Ru/M[s];
+            auto c = _curves[s];
+
+            // Note that Rowan uses Captial Cp,Cv to mean per mass, though I use it for per mole
+            Hs_RT = c.eval_h(T)/Rs/T;
+            G0_RTs[s] = Hs_RT - c.eval_s(T)/Rs;
+            U0_RTs[s] = Hs_RT - 1.0;
+            Cv0_Rs[s] = c.eval_Cp(T)/Rs - 1.0; 
+            u += ns[s]*U0_RTs[s]*Ru*T;
+        }
+    
+        // Equation 2.45: k-> equation index, i-> variable index
+        for (k=0; k<nel; k++){
+            bk = 0.0; for (s=0; s<nsp; s++) bk += a[k*nsp + s]*ns[s];
+    
+            for (i=0; i<nel; i++){
+                akjaijnj = 0.0;
+                for (j=0; j<nsp; j++){
+                    akjaijnj += a[k*nsp+j]*a[i*nsp+j]*ns[j];
+                }
+                //A[k*neq + i+1] = akjaijnj; // Lagrange multiplier matrix entry
+                AB[k,i+1] = akjaijnj; // Lagrange multiplier matrix entry
+            }
+            akjnjmuj = 0.0;
+            akjnjUj = 0.0;
+            for (j=0; j<nsp; j++){
+                mus_RTj = G0_RTs[j] + log(rho0*ns[j]*Ru*T/1e5);
+                akjnjmuj += a[k*nsp+j]*ns[j]*mus_RTj;
+                akjnjUj  += a[k*nsp+j]*ns[j]*U0_RTs[j];
+            }
+            //A[k*neq + 0] = akjnjUj; // Temperature matrix entry
+            //B[k] = bi0[k] - bk + akjnjmuj; // RHS of kth equation 2.45
+            AB[k,0] = akjnjUj; // Temperature matrix entry
+            AB[k,neq] = bi0[k] - bk + akjnjmuj; // RHS of kth equation 2.45
+    
+        }
+        // Equation 2.47
+        njCvj  = 0.0;
+        njUj2  = 0.0;
+        njUjmuj= 0.0;
+    
+        for (j=0; j<nsp; j++){
+            mus_RTj = G0_RTs[j] + log(rho0*ns[j]*Ru*T/1e5);
+            njCvj += ns[j]*Cv0_Rs[j];
+            njUj2 += ns[j]*U0_RTs[j]*U0_RTs[j];
+            njUjmuj += ns[j]*U0_RTs[j]*mus_RTj;
+        }
+        //A[nel*neq + 0]  = njCvj + njUj2;  // Temperature matrix entry
+        //B[nel] = (u0 - u)/Ru/T + njUjmuj; // RHS 
+        AB[nel,0]  = njCvj + njUj2;  // Temperature matrix entry
+        AB[nel,neq] = (u0 - u)/Ru/T + njUjmuj; // RHS 
+    
+        for (i=0; i<nel; i++){
+            aijnjUj = 0.0;
+            for (j=0; j<nsp; j++){
+                aijnjUj += a[i*nsp + j]*ns[j]*U0_RTs[j];
+            }
+            //A[nel*neq + 1+i] = aijnjUj; // Lagrange Multipliers       
+            AB[nel,1+i] = aijnjUj; // Lagrange Multipliers       
+        }
+    
+        //for (i=0; i<neq; i++){
+        //    for (j=0; j<neq; j++){
+        //        printf("%f ", AB[i,j]);
+        //    }
+        //    printf("| %f\n", AB[i,neq]);
+        //}
+        return;
+    }
+
+    @nogc void rhou_species_corrections(double[] S,double[] a,double[] G0_RTs,double[] U0_RTs,
+                                        double rho0,double T, double[] ns, ref double[] dlnns){
+        /*
+        Compute delta_log(ns) from the reduced iteration equations from 
+        equation 2.18m using the other deltas in S
+        Inputs:
+            S      : Corrections (pi1, pi2, pi3 ... dlog(n) [nel+1]
+            a      : elemental composition array [nel,nsp]
+            G0_RTs : Gibbs free energy of each species, divided by RT [nsp]
+            U0_RTs : Internal energy of each species, divided by RT [nsp]
+            rho0   : goal density (kg/m3)
+            T      : current temperature guess (K)
+            ns     : species moles/mixture kg [nsp]
+    
+        Outputs:
+            dllns : change in log(ns) [nsp]
+        */
+        double dlnT,mus_RTs,aispii;
+        int s,i;
+        dlnT = S[0];
+    
+        // These should (should?) have been set during the assemble matrix step
+        //for (s=0; s<nsp; s++){
+        //    lp = lewis + 9*3*s;
+        //    G0_RTs[s] = compute_G0_RT(T, lp);
+        //    U0_RTs[s] = compute_H0_RT(T, lp) - 1.0;
+        //}
+        
+        for (s=0; s<nsp; s++) {
+            mus_RTs = G0_RTs[s] + log(rho0*ns[s]*Ru*T/1e5);
+    
+            aispii = 0.0;
+            for (i=0; i<nel; i++){
+                aispii += a[i*nsp+s]*S[i+1]; // S[i+1] = pi_i, the lagrange multiplier
+            }
+            dlnns[s] = -mus_RTs + U0_RTs[s]*dlnT + aispii;
+        }
+        return; 
+    }
+
+    @nogc void rhou_update_unknowns(double[] S,double[] dlnns, ref double[] ns, ref double T){
+        /*
+        Add corrections to unknown values (ignoring lagrange multipliers)
+        Inputs:
+            S : vector of corrections from matrix step [nel+1]
+            dlnns : vector of species mole/mixture corrections [nsp]
+        Outputs:
+            ns : vector of species mole/mixtures [nsp]
+            T  : pointer to temperature guess (passed by reference!) [1]
+        */
+        int s;
+        double lnns,lnT,n,lnn,lambda;
+        lnT = log(T);  // Removed dereference operation
+        lambda = fmin(1.0, 0.5*fabs(lnT)/fabs(S[0]));
+        T = exp(lnT + lambda*S[0]); // removed dereference operation 
+    
+        n = 0.0; for (s=0; s<nsp; s++) n+=ns[s]; lnn=log(n);
+    
+        for (s=0; s<nsp; s++){
+            lnns = log(ns[s]);
+            lambda = fmin(1.0, fabs(lnn)/fabs(dlnns[s]));
+            ns[s] = exp(lnns + lambda*dlnns[s]);
+    
+            if (ns[s]/n<TRACELIMIT) ns[s] = 0.0;
+        }
+        return;
+    }
+
+    @nogc int solve_rhou(double rho,double u,double[] X0,double[] M,double[] a,
+                         ref double[] X1, ref double Teq, int verbose){
+        /*
+        Compute the equilibrium composition X1 at a fixed volume and internal energy 
+        Inputs:
+            rho   : target Density (kg/m3)
+            u     : target internal energy (J/kg)
+            X0    : Intial Mole fractions [nsp]
+            M     : Molar Mass of each species (kg/mol) [nsp]
+            a     : elemental composition array [nel,nsp]
+            verbose: print debugging information
+    
+        Output:
+            X1  : Equilibrium Mole Fraction [nsp]  
+            Teq: Equilibrium Temperature 
+        */
+        int s,i,j,k,errorcode;
+        double M0,n,M1,errorL2,T;
+    
+        const double tol=1e-6; //FIXME: Make this a class variable?
+        const int attempts=10; //FIXME: Make this a class variable?
+    
+        errorcode=0;
+    
+        // Initialise Arrays and Iteration Guesses
+        M0 = 0.0;
+        for (s=0; s<nsp; s++) M0 += M[s]*X0[s];
+        for (i=0; i<nel; i++){
+            bi0[i] = 0.0;
+            for (s=0; s<nsp; s++){
+                bi0[i] += a[i*nsp + s]*X0[s]/M0;
+                }
+        }
+        n = 0.0;
+        for (s=0; s<nsp; s++) n += X0[s]/M0;
+        for (s=0; s<nsp; s++) ns[s] = n/nsp;
+    
+        //T = temperature_guess(nsp, u, M0, X0, lewis); // Make sure this is set on startup
+        T = Teq; // Should copy? No?
+        if (verbose>0) printf("Guess T: %f\n", T);
+    
+        // Begin Iterations
+        for (k=0; k<attempts; k++){
+            rhou_Assemble_Matrix(a,bi0,rho,u,T,ns,G0_RTs,U0_RTs,Cv0_Rs,AB);
+            gaussJordanElimination(AB);
+
+            for (j=0; j<neq; j++) S[j] = AB[j,neq];
+            rhou_species_corrections(S,a,G0_RTs,U0_RTs,rho,T,ns,dlnns);
+            rhou_update_unknowns(S, dlnns, ns, T);
+    
+            errorL2 = 0.0;
+            for (s=0; s<nsp; s++) errorL2 += dlnns[s]*dlnns[s];
+            errorL2 = pow(errorL2, 0.5);
+            if (verbose>0) printf("iter %d: %f %f %f %f  (%e) \n", k, T, ns[0], ns[1], ns[2], errorL2);
+            if (errorL2<tol) break;
+    
+            if (k>=attempts) {
+                printf("Solver not converged, exiting!\n");
+                errorcode=1;
+                break;
+            }
+        }
+        
+        if ((verbose>0)&&(errorcode==0)) printf("Converged in %d iter, error: %e\n", k, errorL2);
+        // Compute output composition
+        n = 0.0;
+        for (s=0; s<nsp; s++) n += ns[s];
+        M1 = 1.0/n;
+        for (s=0; s<nsp; s++) X1[s] = M1*ns[s];
+        Teq = T;
+    
+        // Don't need to clear memory manually
+        return errorcode;
+    }
+
 } // end class EQGas 
 
 
@@ -445,14 +666,29 @@ version(eq_gas_test) {
         double[3] Xf = [0.0, 0.0, 0.0];
         auto gm = new EqGas("sample-data/co2_test.lua");
         auto Q = new GasState(3, 0);
+        auto Q2= new GasState(3, 0);
+
         Q.massf = Y0;
         Q.p = 0.1*101.35e3;
         Q.T = 2500.0;
-        writeln(Q);
         gm.update_thermo_from_pT(Q);
         gm.massf2molef(Q, Xf); 
-        writeln("Found: ", Xf);
-        writeln("Target: ", Xt);
+        writeln("Test pt: ");
+        writeln("    Found: ", Xf);
+        writeln("    Target: ", Xt);
+        writeln("    ", Q);
+        writeln("    ");
+
+        Q2.massf = Y0;
+        Q2.rho = Q.rho;
+        Q2.u = Q.u;
+        Q2.T = Q.T*1.2;
+        gm.update_thermo_from_rhou(Q2);
+        gm.massf2molef(Q2, Xf); 
+        writeln("Test rhou: ");
+        writeln("    Found: ", Xf);
+        writeln("    Target: ", Xt);
+        writeln("    ", Q2);
 
         return 0;
     } // end main()
