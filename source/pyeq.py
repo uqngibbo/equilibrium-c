@@ -128,6 +128,7 @@ def pt(lib, p, T, Xs0, nsp, nel, lewis, M, a,verbose=0):
     Xs1p  = Xs1.ctypes.data_as(c_double_p)
 
     recode = lib.pt(pp, Tp, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p, verbose)
+    if recode!=0: raise Exception("Equilibrium Calc Failed.")
     return Xs1
 
 def rhou(lib, rho, u, Xs0, nsp, nel, lewis, M, a,verbose=0):
@@ -146,6 +147,7 @@ def rhou(lib, rho, u, Xs0, nsp, nel, lewis, M, a,verbose=0):
     Xs1p  = Xs1.ctypes.data_as(c_double_p)
 
     recode = lib.rhou(rhop, up, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p, Tref, verbose)
+    if recode!=0: raise Exception("Equilibrium Calc Failed.")
     T = Tp.value
     return Xs1, T
 
@@ -164,6 +166,7 @@ def get_u(lib, T, X, nsp, lewis, M):
 def batch_pt(lib, p, T, Xs0, nsp, nel, lewis, M, a,verbose=0):
     """ Call c library to compute equilibrium concentrations at fixed p, T """
     N, nspcheck = Xs0.shape
+    if not Xs0.flags['OWNDATA']: raise Exception("Xs0 Memory Error: Array must own its data")
     if nspcheck!=nsp: raise Exception("nsp ({}) != Xs0.shape[1] ({})".format(nsp, nspcheck))
     if N!=p.size: raise Exception("p.size ({}) != Xs0.shape[0] ({})".format(p.size, N))
     if N!=T.size: raise Exception("T.size ({}) != Xs0.shape[0] ({})".format(T.size, N))
@@ -180,11 +183,13 @@ def batch_pt(lib, p, T, Xs0, nsp, nel, lewis, M, a,verbose=0):
     Xs1p  = Xs1.ctypes.data_as(c_double_p)
 
     recode = lib.batch_pt(N, pp, Tp, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p, verbose)
+    if recode!=0: raise Exception("Equilibrium Calc Failed.")
     return Xs1
 
 def batch_rhou(lib, rho, u, Xs0, nsp, nel, lewis, M, a,verbose=0):
     """ Call c library to compute equilibrium concentrations at fixed rho, u """
     N, nspcheck = Xs0.shape
+    if not Xs0.flags['OWNDATA']: raise Exception("Xs0 Memory Error: Array must own its data")
     if nspcheck!=nsp: raise Exception("nsp ({}) != Xs0.shape[1] ({})".format(nsp, nspcheck))
     if N!=rho.size: raise Exception("rho.size ({}) != Xs0.shape[0] ({})".format(rho.size, N))
     if N!=u.size: raise Exception("u.size ({}) != Xs0.shape[0] ({})".format(u.size, N))
@@ -203,6 +208,7 @@ def batch_rhou(lib, rho, u, Xs0, nsp, nel, lewis, M, a,verbose=0):
     Xs1p  = Xs1.ctypes.data_as(c_double_p)
 
     recode = lib.batch_rhou(N, rhop, up, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p, Tp, verbose)
+    if recode!=0: raise Exception("Equilibrium Calc Failed.")
     return Xs1, T
 
 if __name__=='__main__':

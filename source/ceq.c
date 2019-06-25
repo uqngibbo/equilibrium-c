@@ -144,7 +144,7 @@ int batch_pt(int N, double* p,double* T,double* X0,int nsp,int nel,double* lewis
         X1 : Equilibrium Mole Fraction [N,nsp]  
     */
     double pi, Ti, *X0i, *X1i;
-    int i,result;
+    int i,result,s;
 
     for (i=0; i<N; i++){
         Ti = T[i];
@@ -154,7 +154,11 @@ int batch_pt(int N, double* p,double* T,double* X0,int nsp,int nel,double* lewis
 
         result = solve_pt(pi, Ti, X0i, nsp, nel, lewis, M, a, X1i, verbose);
         if (result!=0){
-            printf("Error in batch_pt @ position: %d", i);
+            printf("Error in batch_pt @ position: %d\n", i);
+            printf("pi: %f Ti: %f \n", pi, Ti);
+            for (s=0; s<nsp; s++) printf("Xs[%d]=%f\n",s,X0i[s]);
+            printf("Retrying with debugging on\n");
+            solve_pt(pi, Ti, X0i, nsp, nel, lewis, M, a, X1i, 1);
             return result;
         }
     }
@@ -193,7 +197,7 @@ int batch_rhou(int N, double* rho,double* u,double* X0,int nsp,int nel,double* l
 
         result = solve_rhou(rhoi, ui, X0i,nsp,nel, lewis, M, a, X1i, Ti, verbose);
         if (result!=0){
-            printf("Error in batch_rhou @ position: %d", i);
+            printf("Error in batch_rhou @ position: %d\n", i);
             return result;
         }
     }

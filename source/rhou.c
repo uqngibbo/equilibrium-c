@@ -219,7 +219,7 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
         Teq: Equilibrium Temperature 
     */
     double *A, *B, *S, *G0_RTs, *U0_RTs, *Cv0_Rs, *ns, *bi0, *dlnns; // Dynamic arrays
-    int neq,s,i,k,errorcode;
+    int neq,s,i,k,errorcode,matrixerror;
     double M0,n,M1,errorL2,thing,T;
 
     const double tol=1e-6;
@@ -256,7 +256,11 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
     // Begin Iterations
     for (k=0; k<attempts; k++){
         Assemble_Matrices(a,bi0,rho,u,T,ns,nsp,nel,A,B,G0_RTs,U0_RTs,Cv0_Rs,lewis);
-        solve_matrix(A, B, S, neq);
+        matrixerror = solve_matrix(A, B, S, neq);
+        if (matrixerror!=0) {
+             for (s=0; s<nsp; s++) ns[s] = fmax(1e-3, ns[s]); // Reset trace if singular
+             continue;
+        }
         species_corrections(S,a,G0_RTs,U0_RTs,rho,T,ns,nsp,nel,dlnns);
         update_unknowns(S, dlnns, nsp, ns, &T);
 

@@ -9,7 +9,7 @@ C library for equilibrium chemistry calculations: linalg module
 #include <stdlib.h>
 #include "linalg.h"
 
-void solve_matrix(double* A, double* B, double *X, int N){
+int solve_matrix(double* A, double* B, double *X, int N){
     /*
     Bare bones Gaussian matrix solver for A*X = B 
        A : pointer to NxN matrix of doubles
@@ -45,6 +45,9 @@ void solve_matrix(double* A, double* B, double *X, int N){
     B[p] = a;
 
     // Multiply Pivot Row
+    //if (fabs(A[k*N+k])<1e-6) printf("Matrix essentially singular! Pivot value: %e\n",fabs(A[k*N+k]));
+    if (fabs(A[k*N+k])<1e-6) return 1; // Check for singular matrix error
+
     a = 1.0/A[k*N+k];
     for (j=0; j<N; j++) {
         A[k*N+j]*=a;
@@ -60,16 +63,16 @@ void solve_matrix(double* A, double* B, double *X, int N){
         B[i] -= a*B[k];
     }
     k++;
-    } // end while loop for row reduction
-
     //for (i=0; i<N; i++) {
-    //    printf("[");
+    //    printf("        [");
     //    for (j=0; j<N; j++){
     //        printf("%f ", A[i*N+j]);
     //    }
     //    printf("]\n");
     //}
     //printf("\n");
+    } // end while loop for row reduction
+
 
     // Now compute X using back substitution
     for (k=N-1; k>=0; k--){
@@ -77,7 +80,7 @@ void solve_matrix(double* A, double* B, double *X, int N){
         for (j=k+1; j<N; j++) a+= A[k*N+j]*X[j]; // Should skip when k=N
         X[k] = B[k] - a;
     }
-    return;
+    return 0;
 }
 
 int iterate_solve_matrix(double* A, double* B, double *X, double* X2, int N){
