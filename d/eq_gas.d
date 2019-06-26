@@ -4,7 +4,7 @@
  *
  * Author: Nick Gibbons 
  * Notes: - Solving works
- *        - Consider integration with the rest code problems (_mol_masses in particular)
+ *        - Consider issues with initial concentrations
  *        - Consider issues with small species getting "deadlocked" into Ys=0
  *        - Consider OOP reimplementation if more solver modes are needed (rhoT etc)
  */
@@ -27,9 +27,11 @@ import gas.gas_model;
 import gas.gas_state;
 import gas.therm_perf_gas;
 
+//FIXME: Remove hardcoded DBPATH and import physical constants from the d module
 const string DBPATH = "/home/qungibbo/programs/ceq/thermo.inp";
 const double Ru=8.3144621;      // Universal Gas Constant (J/mol/K)
 const double TRACELIMIT=1e-7;   // Trace species limiter (for ns/n)
+const double P_atm=101.325e3;
 
 class EqGas: ThermallyPerfectGas {
 public:
@@ -43,10 +45,6 @@ public:
         species_list = _species_names.dup();
         M = _mol_masses.dup();
 
-        _n_species = 1;
-        _species_names.length =  _n_species;
-        _species_names[0] = "mixture";
-
         double[string] species_elements;
         double[string][] element_map;
         string[] element_set;
@@ -57,7 +55,6 @@ public:
             lua_getfield(L, -1, species.toStringz);
             lua_getfield(L, -1, "atomicConstituents");
 
-            // This is some of the most confusing shit I have ever encountered in my entire life
             // Why does this completely idiomatic operation take TEN lines ...
             // Why do I have to micromanage the key numbers in weird inconsistent ways
             // Why does lua next automatically mess with the stack....
@@ -69,7 +66,7 @@ public:
                 string key = to!string(lua_tostring(L, -2));
                 int value = to!int(lua_tointeger(L, -1));
                 species_elements[key] = to!double(value);
-                lua_pop(L, 1); // discard value but keep key so that lua_next can remove it (WHY?!)
+                lua_pop(L, 1); // discard value but keep key so that lua_next can remove it (?!)
             }
             lua_pop(L, 1); // remove atomicConstituents (lua_next removed the key when it broke loop)
             lua_pop(L, 1); // remove species table
@@ -112,9 +109,12 @@ public:
     override void update_thermo_from_pT(GasState Q) 
     {
         int error;
+        //printf("Called update_thermo_from_pt\n");
+        //printf("Q.T: %f  Q.p: %f Q.rho: %f Q.u: %f\n", Q.T, Q.p, Q.rho, Q.u);
+        //printf("Q.YCO2: %f  Q.YCO: %f Q.YO2: %f\n", Q.massf[0], Q.massf[1], Q.massf[2]);
 
         massf2molef(Q, X0); 
-        error = solve_pt(Q.p,Q.T,X0,M,a,X1,1);
+        error = solve_pt(Q.p,Q.T,X0,M,a,X1,0);
         molef2massf(X1, Q);
         _pgMixEOS.update_density(Q);
         _tpgMixEOS.update_energy(Q);
@@ -123,6 +123,10 @@ public:
     override void update_thermo_from_rhou(GasState Q)
     {
         int error;
+        printf("Called update_thermo_from_rhou\n");
+        printf("Q.T: %f  Q.p: %f Q.rho: %f Q.u: %f\n", Q.T, Q.p, Q.rho, Q.u);
+        printf("Q.YCO2: %f  Q.YCO: %f Q.YO2: %f\n", Q.massf[0], Q.massf[1], Q.massf[2]);
+
         massf2molef(Q, X0); 
         error = solve_rhou(Q.rho,Q.u,X0,M,a,X1,Q.T,1);
         molef2massf(X1, Q);
@@ -147,7 +151,26 @@ public:
         throw new Exception("EqGas update_thermo_from_hs not implemented.");
     }
 
-    @nogc @property override uint gasstate_n_species() const { return nsp; }
+    // In case another part of the code tries to ask for a specific species, give them the mass average
+    override number enthalpy(in GasState Q, int isp)
+    {
+        int s;
+        for (s=0; s<nsp; s++) {
+            _h[s] = _curves[s].eval_h(Q.T);
+        }
+        return mass_average(Q, _h);
+    }
+    override number entropy(in GasState Q, int isp)
+    {
+        int s;
+        for (s=0; s<nsp; s++) {
+            _s[s] = _curves[s].eval_s(Q.T) - _R[s]*log(Q.p/1e5);
+        }
+        return mass_average(Q, _s);
+    }
+
+    // FIXME: Possible issue with species names property 
+    @nogc @property override uint n_Conserved_species() const { return 0; } // FIXME: possibly make it 1?
 
 private:
     int nel, nsp, neq;
@@ -324,10 +347,13 @@ private:
             if (ns[s]==0.0) continue;
             lnns = log(ns[s]);
     
-            lambda = fmin(1.0, fabs(lnn)/fabs(dlnns[s]));
+            lambda = fmin(1.0, 0.5*fabs(lnn)/fabs(dlnns[s]));
             ns[s] = exp(lnns + lambda*dlnns[s]);
     
-            if (ns[s]/n_copy<TRACELIMIT) ns[s] = 0.0;
+            if (ns[s]/n_copy<TRACELIMIT){
+                ns[s] = 0.0;
+                dlnns[s] = 0.0; // This species must be considered converged
+            }
         }
     
         return;
@@ -382,7 +408,11 @@ private:
         for (k=0; k<=attempts; k++){
             // 1: Perform an update of the equations
             pt_Assemble_Matrix(a, bi0, G0_RTs, p, ns, n, AB);
-            gaussJordanElimination(AB);
+            try { gaussJordanElimination(AB); }
+            catch (Exception caughtException) {
+                for (s=0; s<nsp; s++) ns[s] = fmax(1e-3, ns[s]);
+                continue;
+            }
             
             for (j=0; j<neq; j++) S[j] = AB[j,neq];
             pt_species_corrections(S, a, G0_RTs, p, n, ns, dlnns);
@@ -575,7 +605,10 @@ private:
             lambda = fmin(1.0, fabs(lnn)/fabs(dlnns[s]));
             ns[s] = exp(lnns + lambda*dlnns[s]);
     
-            if (ns[s]/n<TRACELIMIT) ns[s] = 0.0;
+            if (ns[s]/n<TRACELIMIT){
+                ns[s] = 0.0;
+                dlnns[s] = 0.0; // This species must be considered converged
+            }
         }
         return;
     }
@@ -624,7 +657,11 @@ private:
         // Begin Iterations
         for (k=0; k<attempts; k++){
             rhou_Assemble_Matrix(a,bi0,rho,u,T,ns,G0_RTs,U0_RTs,Cv0_Rs,AB);
-            gaussJordanElimination(AB);
+            try { gaussJordanElimination(AB); }
+            catch (Exception caughtException) {
+                for (s=0; s<nsp; s++) ns[s] = fmax(1e-3, ns[s]);
+                continue;
+            }
 
             for (j=0; j<neq; j++) S[j] = AB[j,neq];
             rhou_species_corrections(S,a,G0_RTs,U0_RTs,rho,T,ns,dlnns);
@@ -689,6 +726,19 @@ version(eq_gas_test) {
         writeln("    Found: ", Xf);
         writeln("    Target: ", Xt);
         writeln("    ", Q2);
+
+        // Test perfectly converged case
+        auto Q3= new GasState(3, 0);
+        Q3.massf[0] = 1.0;
+        Q3.massf[1] = 0.0;
+        Q3.massf[2] = 0.0;
+        Q3.rho = 0.107294;
+        Q3.u = -8999109.972193;
+        Q3.T = 296.0;
+        Q3.p = 6000.0;
+        gm.update_thermo_from_rhou(Q3);
+        writeln("Test converged rhou: ");
+        writeln(Q3);
 
         return 0;
     } // end main()
