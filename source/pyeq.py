@@ -88,7 +88,6 @@ def startup(spnames):
         for k in a.keys(): elements.add(k)
     elements = list(elements)
     elements.sort()
-    print("elements", elements)
 
     nsp = len(spnames)
     nel = len(elements)
@@ -99,7 +98,6 @@ def startup(spnames):
             j = elements.index(k)
             a[j,i] = v
 
-    print("a",a.flatten())
     return elements, nsp, nel, lewisdata, a, M
 
 def load_ceq_library():

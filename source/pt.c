@@ -20,6 +20,28 @@ C library for equilibrium chemistry calculations
 #include "linalg.h"
 #include "pt.h"
 
+static void constraint_errors(double* a, double* G0_RTs, double* bi0, double* pi, double p, double* ns, double n, int nsp, int nel, double* errors){
+    /*
+    Check the actual error in the Lagrange equations
+    */ 
+    int s,i;
+    double lnn, lnp, bi;
+    //lnn = log(n);
+    //lnp = log(p/1e5); // Standard pressure for the tables is one BAR
+
+    //for (s=0; s<nsp; s++){
+    //    errors[s] = G0_RTs[s] + log(ns[s]) - lnn + lnp;
+    //    for (i=0; i<nel; i++) errors[s] -= a[i*nsp + s]*pi[i];
+    //}
+
+    for (i=0; i<nel; i++) {
+        bi = 0.0;
+        for (s=0; s<nsp; s++) bi += a[i*nsp + s]*ns[s];
+        errors[i] = bi - bi0[i];
+    }
+    return;
+}
+
 // static confines this function to this module
 static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,double* ns,double n,
                           int nsp,int nel,double* A, double* B){
@@ -27,7 +49,7 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
     Construct Iteration Matrix for reduced Newton Rhapson step, (eqn 2.24 and 2.26 from cea_I)
     */
     double lnns, lnn, lnp, akjaijnj, akjnjmuj, mus_RTj, bk;
-    double nss, nsmus;
+    double nss, nsmus, coeffsum;
     int k,neq,i,j,s;
     neq = nel+1;
     lnn = log(n);
@@ -35,6 +57,14 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
 
     // Equation 2.24: k-> equation index, i-> variable index
     for (k=0; k<nel; k++){
+
+        if (bi0[k]<1e-16) { // Check for missing missing element equations and Lock
+            for (i=0; i<neq; i++) A[k*neq+i] = 0.0;
+            A[k*neq + k+1] = 1.0;   
+            B[k] = 0.0;
+            continue;
+        }
+
         bk = 0.0; for (s=0; s<nsp; s++) bk += a[k*nsp + s]*ns[s];
         A[k*neq + 0] = bk;
 
@@ -53,10 +83,14 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
 
         }
         B[k] = bi0[k] - bk + akjnjmuj;
+    }
 
-        // Equation 2.26 - > (only the pii entries, we're highjacking k here to go across the last row)
+    // Equation 2.26 - > (only the pii entries, we're highjacking k here to go across the last row)
+    for (k=0; k<nel; k++){
+        bk = 0.0; for (s=0; s<nsp; s++) bk += a[k*nsp + s]*ns[s];
         A[nel*neq + k+1] = bk;
     }
+
     // Equation 2.26 - > (now the rest)
     nss = 0.0;
     nsmus = 0.0;
@@ -66,16 +100,26 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
         nss += ns[j];
         nsmus += ns[j]*mus_RTj;
     }
-    A[nel*neq + 0]  = nss - n; // Yes, this is a problem. Shieeeeeet.
+    A[nel*neq + 0]  = nss - n;
     B[nel] = n - nss + nsmus;
-
+    
+    // Single Species Singularity Check: Set singular equations so that pii trivially equal to 1
     //for (i=0; i<neq; i++){
-    //    printf("    ");
-    //    for (j=0; j<neq; j++){
-    //        printf("%f ", A[i*neq+j]);
+    //    coeffsum = 0.0; for (j=0; j<neq; j++) coeffsum += A[i*neq + j];
+    //    if (coeffsum<1e-16){
+    //        A[i*neq + i+1] = 1.0;   
+    //        B[i] = 0.0;
     //    }
-    //    printf("| %f\n", B[i]);
     //}
+
+    for (i=0; i<neq; i++){
+        printf("    [");
+        for (j=0; j<neq; j++){
+            printf("%f ", A[i*neq+j]);
+        }
+        printf("| %f]", B[i]);
+        printf("\n");
+    }
     return;
 }
 
@@ -117,7 +161,7 @@ static void species_corrections(double* S,double* a,double* G0_RTs,double p,doub
     return; 
 }
 
-static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* n){
+static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,double* n, double* pi){
     /*
     Add corrections to unknown values (ignoring lagrange multipliers)
     Inputs:
@@ -127,29 +171,32 @@ static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* n
     Outputs:
         ns : vector of species mole/mixtures [nsp]
         n  : pointer to total moles/mixture (passed by reference!) [1]
+        pi : Lagrange multipliers
     */
-    int s;
+    int s,i;
     double lnns,lnn,n_copy,lambda;
 
     lnn = log(*n); // compute the log of the thing n is pointing to
     lambda = fmin(1.0, 0.5*fabs(lnn)/fabs(S[0]));
     n_copy = exp(lnn + lambda*S[0]); 
     *n = n_copy;   // thing pointed to by n set to exp(lnn + S[0]);
+    for (i=0; i<nel; i++) pi[i] = S[i+1];
 
     for (s=0; s<nsp; s++){
         if (ns[s]==0.0) {
-            //printf("    s: %d lnns: inf dlnns: %f\n", s, dlnns[s]);
+            //printf("    s: %d lnns: inf       dlnns: % f\n", s, dlnns[s]);
             continue;
         }
         lnns = log(ns[s]);
 
         lambda = fmin(1.0, 0.5*fabs(lnn)/fabs(dlnns[s]));
-        //printf("    s: %d lnns: %f dlnns: %f lambda: %f\n", s, lnns, dlnns[s], lambda);
+        //printf("    s: %d lnns: % f dlnns: % f lambda: % f\n", s, lnns, dlnns[s], lambda);
         ns[s] = exp(lnns + lambda*dlnns[s]);
 
         if (ns[s]/n_copy<TRACELIMIT){
             ns[s] = 0.0;
             dlnns[s] = 0.0; // This species is considered converged now
+            //printf("    Locking species: %d\n", s);
         }
     }
 
@@ -173,12 +220,12 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     Output:
         X1 : Equilibrium Mole Fraction [nsp]  
     */
-    double *A, *B, *S, *G0_RTs, *ns, *bi0, *dlnns; // Dynamic arrays
+    double *A, *B, *S, *G0_RTs, *ns, *bi0, *dlnns, *errors, *pi; // Dynamic arrays
     double *lp;
     int neq,s,i,k,ntrace,errorcode,matrixerror;
-    double M0,n,M1,errorL2,thing;
+    double M0,n,M1,errorL2,thing,errorL22;
 
-    const double tol=1e-6;
+    const double tol=1e-8;
     const int attempts=50;
 
     errorcode=0;
@@ -191,6 +238,8 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     ns    = (double*) malloc(sizeof(double)*nsp);     // Species moles/mixture mass
     bi0   = (double*) malloc(sizeof(double)*nel);     // starting composition coefficients
     dlnns = (double*) malloc(sizeof(double)*nsp);     // starting composition coefficients
+    errors= (double*) malloc(sizeof(double)*nel);     // Trace Free energy constraint errors
+    pi    = (double*) malloc(sizeof(double)*nel);     // Lagrange multipliers
 
     // Initialise Arrays and Iteration Guesses
     M0 = 0.0;
@@ -211,29 +260,54 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         G0_RTs[s] = compute_G0_RT(T, lp);
     }
 
+    // Auto lock species with missing elements
+    for (i=0; i<nel; i++){
+        if (bi0[i]<1e-16) {
+            for (s=0; s<nsp; s++) {
+                if (a[i*nsp + s]!=0) ns[s] = 0.0;
+            }
+        }
+    }
+
     // Main Iteration Loop: 
     for (k=0; k<=attempts; k++){
         // 1: Perform an update of the equations
         Assemble_Matrices(a, bi0, G0_RTs, p, ns, n, nsp, nel, A, B);
         matrixerror = solve_matrix(A, B, S, neq);
         if (matrixerror!=0) {
-             for (s=0; s<nsp; s++) ns[s] = fmax(1e-3, ns[s]); // Reset trace if singular
+             if (verbose) printf("    Singular Matrix!: Unlocking species\n");
+             for (s=0; s<nsp; s++) ns[s] = fmax(2.0*n*TRACELIMIT, ns[s]); // Reset trace if singular
              continue;
         }
         species_corrections(S, a, G0_RTs, p, n, ns, nsp, nel, dlnns);
-        update_unknowns(S, dlnns, nsp, ns, &n);
+        update_unknowns(S, dlnns, nsp, nel, ns, &n, pi);
+        constraint_errors(a, G0_RTs, bi0, pi, p, ns, n, nsp, nel, errors);
 
         // Compute remaining error by checking species corrections
         errorL2 = 0.0;
         for (s=0; s<nsp; s++) errorL2 += dlnns[s]*dlnns[s];
         errorL2 = pow(errorL2, 0.5);
+        errorL22 = 0.0;
+        for (i=0; i<nel; i++) errorL22 += errors[i]*errors[i];
+        errorL22 = pow(errorL22, 0.5);
+
         if (verbose>0){
-            printf("iter %d: [%f]",k,n);
+            printf("iter %2d: [%f]",k,n);
             for (s=0; s<nsp; s++) printf(" %f",ns[s]);
             printf("  (%e)\n", errorL2);
         }
+        //if (verbose>0){
+        //    printf("iter %d: [%e]",k,errorL2);
+        //    for (i=0; i<nel; i++) printf(" %f",errors[i]);
+        //    printf("  (%e)\n", errorL22);
+        //}
+        //if (verbose>0){
+        //    printf("iter %2d: [%f]",k,n);
+        //    for (i=0; i<nel; i++) printf(" %f",pi[i]);
+        //    printf("  (%e)\n", errorL2);
+        //}
 
-        // Check for imminent singularity
+        // Exit loop if all but one species are trace 
         ntrace=0;
         for (s=0; s<nsp; s++) if (ns[s]==0.0) ntrace++;
         if (ntrace==nsp-1) { // Pseudo convergence criteria, all the species but one are trace
@@ -244,9 +318,10 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
             if (verbose>0) printf("Pseudo convergence! Remaining species: (%d)\n", i);
         }
 
-        // Exit loop of convergence is achieved
+        // Exit loop if convergence is achieved
         if (errorL2<tol) break;
 
+        // Exit loop if nans appearing in dlnns
         if (isnan(errorL2)) {
             printf("Solver nan'd, exiting!\n");
             errorcode=1;
@@ -273,6 +348,8 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     free(ns);
     free(bi0);
     free(dlnns);
+    free(errors);
+    free(pi);
     return errorcode;
 }
 

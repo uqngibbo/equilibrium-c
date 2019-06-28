@@ -30,7 +30,7 @@ import gas.therm_perf_gas;
 //FIXME: Remove hardcoded DBPATH and import physical constants from the d module
 const string DBPATH = "/home/qungibbo/programs/ceq/thermo.inp";
 const double Ru=8.3144621;      // Universal Gas Constant (J/mol/K)
-const double TRACELIMIT=1e-7;   // Trace species limiter (for ns/n)
+const double TRACELIMIT=1e-3;   // Trace species limiter (for ns/n)
 const double P_atm=101.325e3;
 
 class EqGas: ThermallyPerfectGas {
