@@ -44,10 +44,8 @@ int solve_matrix(double* A, double* B, double *X, int N){
     B[k] = B[p];
     B[p] = a;
 
-    // Multiply Pivot Row
-    //if (fabs(A[k*N+k])<1e-6) printf("Matrix essentially singular! Pivot value: %e\n",fabs(A[k*N+k]));
     if (fabs(A[k*N+k])<1e-6) return 1; // Check for singular matrix error
-
+    // Multiply Pivot Row
     a = 1.0/A[k*N+k];
     for (j=0; j<N; j++) {
         A[k*N+j]*=a;

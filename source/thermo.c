@@ -10,7 +10,7 @@ C library for equilibrium chemistry calculations: thermo module
 #include "thermo.h"
 
 const double Ru=8.3144621;      // Universal Gas Constant (J/mol/K)
-const double TRACELIMIT=1e-6;   // Trace species limiter (for ns/n)
+const double TRACELIMIT=1e-8;   // Trace species limiter (for ns/n)
 
 double compute_Cp0_R(double Tin, double* lewis){
     /*

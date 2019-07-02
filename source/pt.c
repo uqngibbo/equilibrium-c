@@ -103,23 +103,14 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
     A[nel*neq + 0]  = nss - n;
     B[nel] = n - nss + nsmus;
     
-    // Single Species Singularity Check: Set singular equations so that pii trivially equal to 1
     //for (i=0; i<neq; i++){
-    //    coeffsum = 0.0; for (j=0; j<neq; j++) coeffsum += A[i*neq + j];
-    //    if (coeffsum<1e-16){
-    //        A[i*neq + i+1] = 1.0;   
-    //        B[i] = 0.0;
+    //    printf("    [");
+    //    for (j=0; j<neq; j++){
+    //        printf("%f, ", A[i*neq+j]);
     //    }
+    //    printf("  %f]", B[i]);
+    //    printf("\n");
     //}
-
-    for (i=0; i<neq; i++){
-        printf("    [");
-        for (j=0; j<neq; j++){
-            printf("%f ", A[i*neq+j]);
-        }
-        printf("| %f]", B[i]);
-        printf("\n");
-    }
     return;
 }
 
@@ -161,7 +152,7 @@ static void species_corrections(double* S,double* a,double* G0_RTs,double p,doub
     return; 
 }
 
-static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,double* n, double* pi){
+static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,double* n, double* pi, int verbose){
     /*
     Add corrections to unknown values (ignoring lagrange multipliers)
     Inputs:
@@ -175,6 +166,7 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
     */
     int s,i;
     double lnns,lnn,n_copy,lambda;
+    const char pstring[] = "    s: %d lnns: % f dlnns: % f ns: % e ns/n: %e\n"; 
 
     lnn = log(*n); // compute the log of the thing n is pointing to
     lambda = fmin(1.0, 0.5*fabs(lnn)/fabs(S[0]));
@@ -184,20 +176,21 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
 
     for (s=0; s<nsp; s++){
         if (ns[s]==0.0) {
-            //printf("    s: %d lnns: inf       dlnns: % f\n", s, dlnns[s]);
+            if (verbose>0) printf(pstring, s, -1.0/0.0, dlnns[s], ns[s], ns[s]/n_copy);
             continue;
         }
         lnns = log(ns[s]);
 
         lambda = fmin(1.0, 0.5*fabs(lnn)/fabs(dlnns[s]));
-        //printf("    s: %d lnns: % f dlnns: % f lambda: % f\n", s, lnns, dlnns[s], lambda);
         ns[s] = exp(lnns + lambda*dlnns[s]);
+        lnns = log(ns[s]);
 
         if (ns[s]/n_copy<TRACELIMIT){
             ns[s] = 0.0;
             dlnns[s] = 0.0; // This species is considered converged now
-            //printf("    Locking species: %d\n", s);
+            if (verbose>0) printf("    Locking species: %d\n", s);
         }
+        if (verbose>0) printf(pstring, s, lnns, dlnns[s], ns[s], ns[s]/n_copy);
     }
 
     return;
@@ -222,14 +215,13 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     */
     double *A, *B, *S, *G0_RTs, *ns, *bi0, *dlnns, *errors, *pi; // Dynamic arrays
     double *lp;
-    int neq,s,i,k,ntrace,errorcode,matrixerror;
+    int neq,s,i,k,ntrace,errorcode;
     double M0,n,M1,errorL2,thing,errorL22;
 
     const double tol=1e-8;
     const int attempts=50;
 
     errorcode=0;
-    matrixerror=0;
     neq= nel+1;
     A     = (double*) malloc(sizeof(double)*neq*neq); // Iteration Jacobian
     B     = (double*) malloc(sizeof(double)*neq);     // Iteration RHS
@@ -273,14 +265,14 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     for (k=0; k<=attempts; k++){
         // 1: Perform an update of the equations
         Assemble_Matrices(a, bi0, G0_RTs, p, ns, n, nsp, nel, A, B);
-        matrixerror = solve_matrix(A, B, S, neq);
-        if (matrixerror!=0) {
-             if (verbose) printf("    Singular Matrix!: Unlocking species\n");
+        errorcode = solve_matrix(A, B, S, neq);
+        if (errorcode!=0) {
+             if (verbose>0) printf("    Singular Matrix!: Unlocking species\n");
              for (s=0; s<nsp; s++) ns[s] = fmax(2.0*n*TRACELIMIT, ns[s]); // Reset trace if singular
              continue;
         }
         species_corrections(S, a, G0_RTs, p, n, ns, nsp, nel, dlnns);
-        update_unknowns(S, dlnns, nsp, nel, ns, &n, pi);
+        update_unknowns(S, dlnns, nsp, nel, ns, &n, pi, verbose);
         constraint_errors(a, G0_RTs, bi0, pi, p, ns, n, nsp, nel, errors);
 
         // Compute remaining error by checking species corrections
@@ -296,16 +288,6 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
             for (s=0; s<nsp; s++) printf(" %f",ns[s]);
             printf("  (%e)\n", errorL2);
         }
-        //if (verbose>0){
-        //    printf("iter %d: [%e]",k,errorL2);
-        //    for (i=0; i<nel; i++) printf(" %f",errors[i]);
-        //    printf("  (%e)\n", errorL22);
-        //}
-        //if (verbose>0){
-        //    printf("iter %2d: [%f]",k,n);
-        //    for (i=0; i<nel; i++) printf(" %f",pi[i]);
-        //    printf("  (%e)\n", errorL2);
-        //}
 
         // Exit loop if all but one species are trace 
         ntrace=0;
