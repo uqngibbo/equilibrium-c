@@ -115,7 +115,7 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
 }
 
 static void species_corrections(double* S,double* a,double* G0_RTs,double p,double n,double* ns,
-                        int nsp, int nel, double* dlnns){
+                        int nsp, int nel, double* dlnns, int verbose){
     /*
     Compute delta_log(ns) from the reduced iteration equations from 
     equation 2.18m using the other deltas in S
@@ -152,6 +152,36 @@ static void species_corrections(double* S,double* a,double* G0_RTs,double p,doub
     return; 
 }
 
+static void handle_singularity(double* S,double* a,double* G0_RTs,double p,double n,double* ns,
+                        int nsp, int nel, double* dlnns, int verbose){
+    /*
+    Handle crash by possibly resetting species compositions to fix
+    Inputs:
+        S      : Corrections array (pi1, pi2, pi3 ... dlog(n) [nel+1]
+        a      : elemental composition array [nel,nsp]
+        G0_RTs : Gibbs free energy of each species, divided by RT [nsp]
+        p      : pressure 
+        n      : total moles/mixture kg 
+        ns     : species moles/mixture kg [nsp]
+        nsp    : total number of species
+        nel    : total  number of elements 
+        verbose: flag to print debugging  information
+    */
+    const double RESET=4.0;
+    int s;
+
+    if (verbose>0) printf("    ### Singular Matrix!: Unlocking to %f\n",log(RESET*n*TRACELIMIT));
+
+    for (s=0; s<nsp; s++){
+        if (ns[s]!=0.0) continue;  // Ignore non trace species
+        ns[s] = fmax(RESET*n*TRACELIMIT, ns[s]); // Reset trace trace species to a small but finite number
+        species_corrections(S, a, G0_RTs, p, n, ns, nsp, nel, dlnns, 0); // approximately predict dlnns
+        if (dlnns[s]<0.0) ns[s] = 0.0; // Re-zero any species with negative predicted dlnns
+        if (verbose>0) printf("   faux dlnns: %f changed to: %e \n", dlnns[s], ns[s]);
+    }
+    return; 
+}
+
 static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,double* n, double* pi, int verbose){
     /*
     Add corrections to unknown values (ignoring lagrange multipliers)
@@ -165,8 +195,8 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
         pi : Lagrange multipliers
     */
     int s,i;
-    double lnns,lnn,n_copy,lambda;
-    const char pstring[] = "    s: %d lnns: % f dlnns: % f ns: % e ns/n: %e\n"; 
+    double lnns,lnn,n_copy,lambda,newns,rdlnns;
+    const char pstring[] = "  s: %d lnns: % f rdlnns: % f dlnns: %f TR: % e lambda: % f\n"; 
 
     lnn = log(*n); // compute the log of the thing n is pointing to
     lambda = fmin(1.0, 0.5*fabs(lnn)/fabs(S[0]));
@@ -176,21 +206,23 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
 
     for (s=0; s<nsp; s++){
         if (ns[s]==0.0) {
-            if (verbose>0) printf(pstring, s, -1.0/0.0, dlnns[s], ns[s], ns[s]/n_copy);
+            if (verbose>0) printf(pstring, s, -1.0/0.0, 0.0, dlnns[s], 0.0, 0.0);
+            dlnns[s] = 0.0;
             continue;
         }
         lnns = log(ns[s]);
-
         lambda = fmin(1.0, 0.5*fabs(lnn)/fabs(dlnns[s]));
-        ns[s] = exp(lnns + lambda*dlnns[s]);
-        lnns = log(ns[s]);
+        newns = exp(lnns + lambda*dlnns[s]);
+        rdlnns = log(newns) - lnns;
+        ns[s] = newns;
+        lnns = log(newns);
 
         if (ns[s]/n_copy<TRACELIMIT){
+            if (verbose>0) printf("    Locking species: %d (%f)\n", s, dlnns[s]);
             ns[s] = 0.0;
             dlnns[s] = 0.0; // This species is considered converged now
-            if (verbose>0) printf("    Locking species: %d\n", s);
         }
-        if (verbose>0) printf(pstring, s, lnns, dlnns[s], ns[s], ns[s]/n_copy);
+        if (verbose>0) printf(pstring, s, lnns, rdlnns, dlnns[s], ns[s]/n_copy/TRACELIMIT, lambda);
     }
 
     return;
@@ -218,7 +250,7 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     int neq,s,i,k,ntrace,errorcode;
     double M0,n,M1,errorL2,thing,errorL22;
 
-    const double tol=1e-8;
+    const double tol=1e-9;
     const int attempts=50;
 
     errorcode=0;
@@ -267,11 +299,10 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         Assemble_Matrices(a, bi0, G0_RTs, p, ns, n, nsp, nel, A, B);
         errorcode = solve_matrix(A, B, S, neq);
         if (errorcode!=0) {
-             if (verbose>0) printf("    Singular Matrix!: Unlocking species\n");
-             for (s=0; s<nsp; s++) ns[s] = fmax(2.0*n*TRACELIMIT, ns[s]); // Reset trace if singular
-             continue;
+            handle_singularity(S, a, G0_RTs, p, n, ns, nsp, nel, dlnns, verbose);
+            continue;
         }
-        species_corrections(S, a, G0_RTs, p, n, ns, nsp, nel, dlnns);
+        species_corrections(S, a, G0_RTs, p, n, ns, nsp, nel, dlnns, verbose);
         update_unknowns(S, dlnns, nsp, nel, ns, &n, pi, verbose);
         constraint_errors(a, G0_RTs, bi0, pi, p, ns, n, nsp, nel, errors);
 
@@ -284,7 +315,7 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         errorL22 = pow(errorL22, 0.5);
 
         if (verbose>0){
-            printf("iter %2d: [%f]",k,n);
+            printf("iter %2d: [%e]",k,errorL22);
             for (s=0; s<nsp; s++) printf(" %f",ns[s]);
             printf("  (%e)\n", errorL2);
         }
@@ -297,14 +328,15 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
             n = 1.0/M[i];
             ns[i] = n;
             errorL2 = 0.0;
+            errorL22= 0.0;
             if (verbose>0) printf("Pseudo convergence! Remaining species: (%d)\n", i);
         }
 
         // Exit loop if convergence is achieved
-        if (errorL2<tol) break;
+        if (errorL22<tol) break;
 
         // Exit loop if nans appearing in dlnns
-        if (isnan(errorL2)) {
+        if (isnan(errorL22)) {
             printf("Solver nan'd, exiting!\n");
             errorcode=1;
             break;
@@ -318,7 +350,7 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         }
     }
     
-    if ((verbose>0)&&(errorcode==0)) printf("Converged in %d iter, error: %e\n", k, errorL2);
+    if ((verbose>0)&&(errorcode==0)) printf("Converged in %d iter, error: %e\n", k, errorL22);
     // Compute output composition
     M1 = 1.0/n;
     for (s=0; s<nsp; s++) X1[s] = M1*ns[s];
