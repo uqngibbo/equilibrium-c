@@ -20,26 +20,27 @@ C library for equilibrium chemistry calculations
 #include "linalg.h"
 #include "pt.h"
 
-static void constraint_errors(double* a, double* G0_RTs, double* bi0, double* pi, double p, double* ns, double n, int nsp, int nel, double* errors){
+static double constraint_errors(double* a,double* bi0,double* ns,int nsp,int nel,double* dlnns,int verbose){
     /*
-    Check the actual error in the Lagrange equations
+    Unified computation of current error to determine whether to break loop
     */ 
     int s,i;
-    double lnn, lnp, bi;
-    //lnn = log(n);
-    //lnp = log(p/1e5); // Standard pressure for the tables is one BAR
+    double bi,errorrms,error;
 
-    //for (s=0; s<nsp; s++){
-    //    errors[s] = G0_RTs[s] + log(ns[s]) - lnn + lnp;
-    //    for (i=0; i<nel; i++) errors[s] -= a[i*nsp + s]*pi[i];
-    //}
+    // Compute the change in current variables (note this is the unlimited dlnns! not the real change)
+    errorrms = 0.0;
+
+    for (s=0; s<nsp; s++) errorrms += dlnns[s]*dlnns[s];
 
     for (i=0; i<nel; i++) {
         bi = 0.0;
         for (s=0; s<nsp; s++) bi += a[i*nsp + s]*ns[s];
-        errors[i] = bi - bi0[i];
+        error = bi - bi0[i];
+        errorrms += error*error;
     }
-    return;
+    errorrms /= (nsp+nel);
+    errorrms = sqrt(errorrms);
+    return errorrms;
 }
 
 // static confines this function to this module
@@ -182,7 +183,7 @@ static void handle_singularity(double* S,double* a,double* G0_RTs,double p,doubl
     return; 
 }
 
-static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,double* n, double* pi, int verbose){
+static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,double* n, int verbose){
     /*
     Add corrections to unknown values (ignoring lagrange multipliers)
     Inputs:
@@ -192,7 +193,6 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
     Outputs:
         ns : vector of species mole/mixtures [nsp]
         n  : pointer to total moles/mixture (passed by reference!) [1]
-        pi : Lagrange multipliers
     */
     int s,i;
     double lnns,lnn,n_copy,lambda,newns,rdlnns;
@@ -202,7 +202,6 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
     lambda = fmin(1.0, 0.5*fabs(lnn)/fabs(S[0]));
     n_copy = exp(lnn + lambda*S[0]); 
     *n = n_copy;   // thing pointed to by n set to exp(lnn + S[0]);
-    for (i=0; i<nel; i++) pi[i] = S[i+1];
 
     for (s=0; s<nsp; s++){
         if (ns[s]==0.0) {
@@ -245,10 +244,10 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     Output:
         X1 : Equilibrium Mole Fraction [nsp]  
     */
-    double *A, *B, *S, *G0_RTs, *ns, *bi0, *dlnns, *errors, *pi; // Dynamic arrays
+    double *A, *B, *S, *G0_RTs, *ns, *bi0, *dlnns, *errors; // Dynamic arrays
     double *lp;
     int neq,s,i,k,ntrace,errorcode;
-    double M0,n,M1,errorL2,thing,errorL22;
+    double M0,n,M1,errorL2,thing,errorL22,errorrms;
 
     const double tol=1e-9;
     const int attempts=50;
@@ -262,8 +261,7 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     ns    = (double*) malloc(sizeof(double)*nsp);     // Species moles/mixture mass
     bi0   = (double*) malloc(sizeof(double)*nel);     // starting composition coefficients
     dlnns = (double*) malloc(sizeof(double)*nsp);     // starting composition coefficients
-    errors= (double*) malloc(sizeof(double)*nel);     // Trace Free energy constraint errors
-    pi    = (double*) malloc(sizeof(double)*nel);     // Lagrange multipliers
+    errors= (double*) malloc(sizeof(double)*nel);     // Nuclear constraint errors
 
     // Initialise Arrays and Iteration Guesses
     M0 = 0.0;
@@ -303,21 +301,13 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
             continue;
         }
         species_corrections(S, a, G0_RTs, p, n, ns, nsp, nel, dlnns, verbose);
-        update_unknowns(S, dlnns, nsp, nel, ns, &n, pi, verbose);
-        constraint_errors(a, G0_RTs, bi0, pi, p, ns, n, nsp, nel, errors);
-
-        // Compute remaining error by checking species corrections
-        errorL2 = 0.0;
-        for (s=0; s<nsp; s++) errorL2 += dlnns[s]*dlnns[s];
-        errorL2 = pow(errorL2, 0.5);
-        errorL22 = 0.0;
-        for (i=0; i<nel; i++) errorL22 += errors[i]*errors[i];
-        errorL22 = pow(errorL22, 0.5);
+        update_unknowns(S, dlnns, nsp, nel, ns, &n, verbose);
+        errorrms = constraint_errors(a, bi0, ns, nsp, nel, dlnns, verbose);
 
         if (verbose>0){
-            printf("iter %2d: [%e]",k,errorL22);
+            printf("iter %2d: [%f]",k,n);
             for (s=0; s<nsp; s++) printf(" %f",ns[s]);
-            printf("  (%e)\n", errorL2);
+            printf("  (%e)\n", errorrms);
         }
 
         // Exit loop if all but one species are trace 
@@ -327,16 +317,17 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
             for (s=0; s<nsp; s++) if (ns[s]!=0.0) i=s;
             n = 1.0/M[i];
             ns[i] = n;
-            errorL2 = 0.0;
-            errorL22= 0.0;
+            //errorL2 = 0.0;
+            //errorL22= 0.0;
+            errorrms = 0.0;
             if (verbose>0) printf("Pseudo convergence! Remaining species: (%d)\n", i);
         }
 
         // Exit loop if convergence is achieved
-        if (errorL22<tol) break;
+        if (errorrms<tol) break;
 
         // Exit loop if nans appearing in dlnns
-        if (isnan(errorL22)) {
+        if (isnan(errorrms)) {
             printf("Solver nan'd, exiting!\n");
             errorcode=1;
             break;
@@ -350,7 +341,7 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         }
     }
     
-    if ((verbose>0)&&(errorcode==0)) printf("Converged in %d iter, error: %e\n", k, errorL22);
+    if ((verbose>0)&&(errorcode==0)) printf("Converged in %d iter, error: %e\n", k, errorrms);
     // Compute output composition
     M1 = 1.0/n;
     for (s=0; s<nsp; s++) X1[s] = M1*ns[s];
@@ -363,7 +354,6 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     free(bi0);
     free(dlnns);
     free(errors);
-    free(pi);
     return errorcode;
 }
 
