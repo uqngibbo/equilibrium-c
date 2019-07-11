@@ -18,30 +18,8 @@ C library for equilibrium chemistry calculations
 
 #include "thermo.h"
 #include "linalg.h"
+#include "common.h"
 #include "rhou.h"
-
-static double constraint_errors(double* a,double* bi0,double* ns,int nsp,int nel,double* dlnns,int verbose){
-    /*
-    Unified computation of current error to determine whether to break loop
-    */ 
-    int s,i;
-    double bi,errorrms,error;
-
-    // Compute the change in current variables (note this is the unlimited dlnns! not the real change)
-    errorrms = 0.0;
-
-    for (s=0; s<nsp; s++) errorrms += dlnns[s]*dlnns[s];
-
-    for (i=0; i<nel; i++) {
-        bi = 0.0;
-        for (s=0; s<nsp; s++) bi += a[i*nsp + s]*ns[s];
-        error = bi - bi0[i];
-        errorrms += error*error;
-    }
-    errorrms /= (nsp+nel);
-    errorrms = sqrt(errorrms);
-    return errorrms;
-}
 
 static void Assemble_Matrices(double* a,double* bi0, double rho0,double u0,double T,double* ns,int nsp,
                               int nel,double* A, double* B, double* G0_RTs, double* U0_RTs,
@@ -179,7 +157,7 @@ static void handle_singularity(double* S,double* a,double* G0_RTs,double* U0_RTs
     const double RESET=4.0;
     int s;
 
-    if (verbose>0) printf("    ### Singular Matrix!: Unlocking to %f\n",log(RESET*n*TRACELIMIT));
+    if (verbose>1) printf("    ### Singular Matrix!: Unlocking to %f\n",log(RESET*n*TRACELIMIT));
 
     for (s=0; s<nsp; s++){
         if (ns[s]!=0.0) continue;  // Ignore non trace species
@@ -187,12 +165,12 @@ static void handle_singularity(double* S,double* a,double* G0_RTs,double* U0_RTs
         ns[s] = fmax(RESET*n*TRACELIMIT, ns[s]); // Reset trace trace species to a small but finite number
         species_corrections(S,a,G0_RTs,U0_RTs,rho,T,ns,nsp,nel,dlnns,0);
         if (dlnns[s]<0.0) ns[s] = 0.0; // Re-zero any species with negative predicted dlnns
-        if (verbose>0) printf("   faux dlnns: %f changed to: %e \n", dlnns[s], ns[s]);
+        if (verbose>1) printf("   faux dlnns: %f changed to: %e \n", dlnns[s], ns[s]);
     }
     return; 
 }
 
-static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* T, int verbose){
+static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* T,double* np,int verbose){
     /*
     Add corrections to unknown values (ignoring lagrange multipliers)
     Inputs:
@@ -202,6 +180,7 @@ static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* T
     Outputs:
         ns : vector of species mole/mixtures [nsp]
         T  : pointer to temperature guess (passed by reference!) [1]
+        np : pointer to n, total moles/mixture (passed by reference!) [1]
     */
     int s;
     double lnns,lnT,n,lnn,lambda;
@@ -209,12 +188,12 @@ static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* T
     lnT = log(*T); // compute the log of the thing T is pointing to
     lambda = fmin(1.0, 0.5*fabs(lnT)/fabs(S[0]));
     *T = exp(lnT + lambda*S[0]); // thing pointed to by T set to exp(lnT + S[0]);
-
-    n = 0.0; for (s=0; s<nsp; s++) n+=ns[s]; lnn=log(n);
+    n = *np;
+    lnn=log(n);
 
     for (s=0; s<nsp; s++){
         if (ns[s]==0.0) {
-            if (verbose>0) printf(pstring, s, -1.0/0.0, 0.0, dlnns[s], 0.0, 0.0);
+            if (verbose>1) printf(pstring, s, -1.0/0.0, 0.0, dlnns[s], 0.0, 0.0);
             dlnns[s] = 0.0;
             continue;
         }
@@ -223,11 +202,13 @@ static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* T
         ns[s] = exp(lnns + lambda*dlnns[s]);
 
         if (ns[s]/n<TRACELIMIT){
-            if (verbose>0) printf("    Locking species: %d (%f)\n", s, dlnns[s]);
+            if (verbose>1) printf("    Locking species: %d (%f)\n", s, dlnns[s]);
             ns[s] = 0.0;
             dlnns[s] = 0.0; // This species is considered converged now
         }
     }
+    n = 0.0; for (s=0; s<nsp; s++) n+=ns[s];
+    *np = n;
     return;
 }
 
@@ -285,7 +266,7 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
         X1  : Equilibrium Mole Fraction [nsp]  
         Teq: Equilibrium Temperature 
     */
-    double *A, *B, *S, *G0_RTs, *U0_RTs, *Cv0_Rs, *ns, *bi0, *dlnns, *errors; // Dynamic arrays
+    double *A, *B, *S, *G0_RTs, *U0_RTs, *Cv0_Rs, *ns, *bi0, *dlnns; // Dynamic arrays
     int neq,s,i,k,errorcode,ntrace;
     double M0,n,M1,errorL2,errorL22,thing,T,errorrms;
 
@@ -302,22 +283,9 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
     Cv0_Rs= (double*) malloc(sizeof(double)*nsp);     // Species Specific Heat @ Const. volume 
     ns    = (double*) malloc(sizeof(double)*nsp);     // Species moles/mixture mass
     bi0   = (double*) malloc(sizeof(double)*nel);     // starting composition coefficients
-    dlnns = (double*) malloc(sizeof(double)*nsp);     // starting composition coefficients
-    errors= (double*) malloc(sizeof(double)*nel);     // Nuclear constraint errors
+    dlnns = (double*) malloc(sizeof(double)*nsp);     // raw change in log(ns)
 
-    // Initialise Arrays and Iteration Guesses
-    M0 = 0.0;
-    for (s=0; s<nsp; s++) M0 += M[s]*X0[s];
-    for (i=0; i<nel; i++){
-        bi0[i] = 0.0;
-        for (s=0; s<nsp; s++){
-            bi0[i] += a[i*nsp + s]*X0[s]/M0;
-            }
-    }
-    n = 0.0;
-    for (s=0; s<nsp; s++) n += X0[s]/M0;
-    for (s=0; s<nsp; s++) ns[s] = n/nsp;
-
+    composition_guess(a, M, X0, nsp, nel, ns, &n, bi0);
     T = temperature_guess(nsp, u, M0, X0, lewis);
     if (verbose>0) printf("Guess T: %f\n", T);
 
@@ -330,8 +298,8 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
             continue;
         }
         species_corrections(S,a,G0_RTs,U0_RTs,rho,T,ns,nsp,nel,dlnns,verbose);
-        update_unknowns(S, dlnns, nsp, ns, &T, verbose);
-        errorrms = constraint_errors(a, bi0, ns, nsp, nel, dlnns, verbose); //FIXME: Add T somehow?
+        update_unknowns(S, dlnns, nsp, ns, &T, &n, verbose);
+        errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, dlnns, verbose);
 
         if (verbose>0){
             printf("iter %2d: [%f]",k,n);
@@ -340,16 +308,13 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
         }
 
         // Exit loop if all but one species are trace 
-        ntrace=0;
-        for (s=0; s<nsp; s++) if (ns[s]==0.0) ntrace++;
-        if (ntrace==nsp-1) { // Pseudo convergence criteria, all the species but one are trace
-            for (s=0; s<nsp; s++) if (ns[s]!=0.0) i=s;
+        i = all_but_one_species_are_trace(nsp, ns);
+        if (i>0){
+            if (verbose>0) printf("Pseudo convergence! Remaining species: (%d)\n", i);
             n = 1.0/M[i];
             ns[i] = n;
-            //errorL2 = 0.0;
-            //errorL22= 0.0;
             errorrms = 0.0;
-            if (verbose>0) printf("Pseudo convergence! Remaining species: (%d)\n", i);
+            break;
         }
 
         // Exit loop if convergence is achieved
@@ -386,7 +351,6 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
     free(ns);
     free(bi0);
     free(dlnns);
-    free(errors);
     return errorcode;
 }
 

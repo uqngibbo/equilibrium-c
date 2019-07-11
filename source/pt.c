@@ -18,32 +18,9 @@ C library for equilibrium chemistry calculations
 
 #include "thermo.h"
 #include "linalg.h"
+#include "common.h"
 #include "pt.h"
 
-static double constraint_errors(double* a,double* bi0,double* ns,int nsp,int nel,double* dlnns,int verbose){
-    /*
-    Unified computation of current error to determine whether to break loop
-    */ 
-    int s,i;
-    double bi,errorrms,error;
-
-    // Compute the change in current variables (note this is the unlimited dlnns! not the real change)
-    errorrms = 0.0;
-
-    for (s=0; s<nsp; s++) errorrms += dlnns[s]*dlnns[s];
-
-    for (i=0; i<nel; i++) {
-        bi = 0.0;
-        for (s=0; s<nsp; s++) bi += a[i*nsp + s]*ns[s];
-        error = bi - bi0[i];
-        errorrms += error*error;
-    }
-    errorrms /= (nsp+nel);
-    errorrms = sqrt(errorrms);
-    return errorrms;
-}
-
-// static confines this function to this module
 static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,double* ns,double n,
                           int nsp,int nel,double* A, double* B){
     /*
@@ -171,14 +148,14 @@ static void handle_singularity(double* S,double* a,double* G0_RTs,double p,doubl
     const double RESET=4.0;
     int s;
 
-    if (verbose>0) printf("    ### Singular Matrix!: Unlocking to %f\n",log(RESET*n*TRACELIMIT));
+    if (verbose>1) printf("    ### Singular Matrix!: Unlocking to %f\n",log(RESET*n*TRACELIMIT));
 
     for (s=0; s<nsp; s++){
         if (ns[s]!=0.0) continue;  // Ignore non trace species
         ns[s] = fmax(RESET*n*TRACELIMIT, ns[s]); // Reset trace trace species to a small but finite number
         species_corrections(S, a, G0_RTs, p, n, ns, nsp, nel, dlnns, 0); // approximately predict dlnns
         if (dlnns[s]<0.0) ns[s] = 0.0; // Re-zero any species with negative predicted dlnns
-        if (verbose>0) printf("   faux dlnns: %f changed to: %e \n", dlnns[s], ns[s]);
+        if (verbose>1) printf("   faux dlnns: %f changed to: %e \n", dlnns[s], ns[s]);
     }
     return; 
 }
@@ -205,7 +182,7 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
 
     for (s=0; s<nsp; s++){
         if (ns[s]==0.0) {
-            if (verbose>0) printf(pstring, s, -1.0/0.0, 0.0, dlnns[s], 0.0, 0.0);
+            if (verbose>1) printf(pstring, s, -1.0/0.0, 0.0, dlnns[s], 0.0, 0.0);
             dlnns[s] = 0.0;
             continue;
         }
@@ -217,11 +194,11 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
         lnns = log(newns);
 
         if (ns[s]/n_copy<TRACELIMIT){
-            if (verbose>0) printf("    Locking species: %d (%f)\n", s, dlnns[s]);
+            if (verbose>1) printf("    Locking species: %d (%f)\n", s, dlnns[s]);
             ns[s] = 0.0;
             dlnns[s] = 0.0; // This species is considered converged now
         }
-        if (verbose>0) printf(pstring, s, lnns, rdlnns, dlnns[s], ns[s]/n_copy/TRACELIMIT, lambda);
+        if (verbose>1) printf(pstring, s, lnns, rdlnns, dlnns[s], ns[s]/n_copy/TRACELIMIT, lambda);
     }
 
     return;
@@ -244,10 +221,10 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     Output:
         X1 : Equilibrium Mole Fraction [nsp]  
     */
-    double *A, *B, *S, *G0_RTs, *ns, *bi0, *dlnns, *errors; // Dynamic arrays
+    double *A, *B, *S, *G0_RTs, *ns, *bi0, *dlnns; // Dynamic arrays
     double *lp;
-    int neq,s,i,k,ntrace,errorcode;
-    double M0,n,M1,errorL2,thing,errorL22,errorrms;
+    int neq,s,i,k,errorcode;
+    double n,M1,errorrms;
 
     const double tol=1e-9;
     const int attempts=50;
@@ -261,34 +238,13 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     ns    = (double*) malloc(sizeof(double)*nsp);     // Species moles/mixture mass
     bi0   = (double*) malloc(sizeof(double)*nel);     // starting composition coefficients
     dlnns = (double*) malloc(sizeof(double)*nsp);     // starting composition coefficients
-    errors= (double*) malloc(sizeof(double)*nel);     // Nuclear constraint errors
 
-    // Initialise Arrays and Iteration Guesses
-    M0 = 0.0;
-    for (s=0; s<nsp; s++) M0 += M[s]*X0[s];
-    for (i=0; i<nel; i++){
-        bi0[i] = 0.0;
-        for (s=0; s<nsp; s++){
-            bi0[i] += a[i*nsp + s]*X0[s]/M0;
-            }
-    }
-    n = 0.0;
-    for (s=0; s<nsp; s++) n += X0[s]/M0;
-    for (s=0; s<nsp; s++) ns[s] = n/nsp;
+    composition_guess(a, M, X0, nsp, nel, ns, &n, bi0);
     n*=1.1;
 
     for (s=0; s<nsp; s++){
         lp = lewis + 9*3*s;
         G0_RTs[s] = compute_G0_RT(T, lp);
-    }
-
-    // Auto lock species with missing elements
-    for (i=0; i<nel; i++){
-        if (bi0[i]<1e-16) {
-            for (s=0; s<nsp; s++) {
-                if (a[i*nsp + s]!=0) ns[s] = 0.0;
-            }
-        }
     }
 
     // Main Iteration Loop: 
@@ -302,7 +258,7 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         }
         species_corrections(S, a, G0_RTs, p, n, ns, nsp, nel, dlnns, verbose);
         update_unknowns(S, dlnns, nsp, nel, ns, &n, verbose);
-        errorrms = constraint_errors(a, bi0, ns, nsp, nel, dlnns, verbose);
+        errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, dlnns, verbose);
 
         if (verbose>0){
             printf("iter %2d: [%f]",k,n);
@@ -311,16 +267,13 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         }
 
         // Exit loop if all but one species are trace 
-        ntrace=0;
-        for (s=0; s<nsp; s++) if (ns[s]==0.0) ntrace++;
-        if (ntrace==nsp-1) { // Pseudo convergence criteria, all the species but one are trace
-            for (s=0; s<nsp; s++) if (ns[s]!=0.0) i=s;
+        i = all_but_one_species_are_trace(nsp, ns);
+        if (i>0){
+            if (verbose>0) printf("Pseudo convergence! Remaining species: (%d)\n", i);
             n = 1.0/M[i];
             ns[i] = n;
-            //errorL2 = 0.0;
-            //errorL22= 0.0;
             errorrms = 0.0;
-            if (verbose>0) printf("Pseudo convergence! Remaining species: (%d)\n", i);
+            break;
         }
 
         // Exit loop if convergence is achieved
@@ -353,7 +306,6 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     free(ns);
     free(bi0);
     free(dlnns);
-    free(errors);
     return errorcode;
 }
 
