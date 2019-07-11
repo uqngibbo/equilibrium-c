@@ -247,6 +247,7 @@ double temperature_guess(int nsp, double u, double* M, double* X0, double* lewis
         cv += cvs;
     }
     T = (u + uf)/cv;
+    T = fmax(T, 200.0); // Limit in case of bad initial state.
     return T;
 }
 
