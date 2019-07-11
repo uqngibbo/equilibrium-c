@@ -226,9 +226,6 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     int neq,s,i,k,errorcode;
     double n,M1,errorrms;
 
-    const double tol=1e-9;
-    const int attempts=50;
-
     errorcode=0;
     neq= nel+1;
     A     = (double*) malloc(sizeof(double)*neq*neq); // Iteration Jacobian

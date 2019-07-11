@@ -270,9 +270,6 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
     int neq,s,i,k,errorcode,ntrace;
     double M0,n,M1,errorL2,errorL22,thing,T,errorrms;
 
-    const double tol=1e-6;
-    const int attempts=10;
-
     errorcode=0;
     neq= nel+1;
     A     = (double*) malloc(sizeof(double)*neq*neq); // Iteration Jacobian

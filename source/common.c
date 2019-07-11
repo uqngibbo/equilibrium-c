@@ -9,6 +9,10 @@ C library for equilibrium chemistry calculations
 #include <math.h>
 #include <stdlib.h>
 
+const double TRACELIMIT=1e-8;   // Trace species limiter (for ns/n)
+const double tol=1e-9;
+const int attempts=50;
+
 void composition_guess(double* a,double* M,double* X0,int nsp,int nel,double* ns,double* np,double* bi0){
     /*
     Unified setup of initial composition from mole fractions
