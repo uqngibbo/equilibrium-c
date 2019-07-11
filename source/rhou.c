@@ -212,13 +212,13 @@ static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* T
     return;
 }
 
-double temperature_guess(int nsp, double u, double M0, double* X0, double* lewis){
+double temperature_guess(int nsp, double u, double* M, double* X0, double* lewis){
     /*
     Guess a first iteration temperature assuming constant Cv from 298 K
     Inputs:
         nsp   : Number of species
         u     : Target mixture internal energy (J/kg)
-        M0    : Initial composition molecular weight (kg/mol)
+        M     : Species molecular weight (kg/mol) [nsp]
         X0    : Intiial composition mole fractions [nsp]
         lewis : Nasa Lewis Thermodynamic Database Data [nsp*3*9]
 
@@ -227,7 +227,10 @@ double temperature_guess(int nsp, double u, double M0, double* X0, double* lewis
     */
     int s;
     double* lp;
-    double uf,cv,T,ufs,cvs,Cps298,Hfs298,ns0;
+    double uf,cv,T,ufs,cvs,Cps298,Hfs298,ns0,M0;
+
+    M0 = 0.0;
+    for (s=0; s<nsp; s++) M0 += M[s]*X0[s];
 
     uf = 0.0;
     cv = 0.0;
@@ -283,7 +286,7 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
     dlnns = (double*) malloc(sizeof(double)*nsp);     // raw change in log(ns)
 
     composition_guess(a, M, X0, nsp, nel, ns, &n, bi0);
-    T = temperature_guess(nsp, u, M0, X0, lewis);
+    T = temperature_guess(nsp, u, M, X0, lewis);
     if (verbose>0) printf("Guess T: %f\n", T);
 
     // Begin Iterations
