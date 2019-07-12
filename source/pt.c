@@ -148,7 +148,7 @@ static void handle_singularity(double* S,double* a,double* G0_RTs,double p,doubl
     const double RESET=4.0;
     int s;
 
-    if (verbose>1) printf("    ### Singular Matrix!: Unlocking to %f\n",log(RESET*n*TRACELIMIT));
+    if (verbose>0) printf("    ### Singular Matrix!: Unlocking to %f\n",log(RESET*n*TRACELIMIT));
 
     for (s=0; s<nsp; s++){
         if (ns[s]!=0.0) continue;  // Ignore non trace species
@@ -160,7 +160,7 @@ static void handle_singularity(double* S,double* a,double* G0_RTs,double p,doubl
     return; 
 }
 
-static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,double* n, int verbose){
+static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,double* n,int verbose){
     /*
     Add corrections to unknown values (ignoring lagrange multipliers)
     Inputs:
@@ -172,7 +172,7 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
         n  : pointer to total moles/mixture (passed by reference!) [1]
     */
     int s,i;
-    double lnns,lnn,n_copy,lambda,newns,rdlnns;
+    double lnns,lnn,n_copy,lambda,newns,rdlnns,bi;
     const char pstring[] = "  s: %d lnns: % f rdlnns: % f dlnns: %f TR: % e lambda: % f\n"; 
 
     lnn = log(*n); // compute the log of the thing n is pointing to
@@ -193,11 +193,6 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
         ns[s] = newns;
         lnns = log(newns);
 
-        if (ns[s]/n_copy<TRACELIMIT){
-            if (verbose>1) printf("    Locking species: %d (%f)\n", s, dlnns[s]);
-            ns[s] = 0.0;
-            dlnns[s] = 0.0; // This species is considered converged now
-        }
         if (verbose>1) printf(pstring, s, lnns, rdlnns, dlnns[s], ns[s]/n_copy/TRACELIMIT, lambda);
     }
 
@@ -255,6 +250,7 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         }
         species_corrections(S, a, G0_RTs, p, n, ns, nsp, nel, dlnns, verbose);
         update_unknowns(S, dlnns, nsp, nel, ns, &n, verbose);
+        handle_trace_species_locking(a, n, nsp, nel, ns, bi0, dlnns, verbose);
         errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, dlnns, verbose);
 
         if (verbose>0){
@@ -292,6 +288,7 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     }
     
     if ((verbose>0)&&(errorcode==0)) printf("Converged in %d iter, error: %e\n", k, errorrms);
+    if ((verbose>0)&&(errorcode>0)) printf("Convergence failure in %d iter, error: %e\n", k, errorrms);
     // Compute output composition
     M1 = 1.0/n;
     for (s=0; s<nsp; s++) X1[s] = M1*ns[s];

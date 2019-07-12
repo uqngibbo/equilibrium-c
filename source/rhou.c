@@ -200,12 +200,6 @@ static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* T
         lnns = log(ns[s]);
         lambda = fmin(1.0, fabs(lnn)/fabs(dlnns[s]));
         ns[s] = exp(lnns + lambda*dlnns[s]);
-
-        if (ns[s]/n<TRACELIMIT){
-            if (verbose>1) printf("    Locking species: %d (%f)\n", s, dlnns[s]);
-            ns[s] = 0.0;
-            dlnns[s] = 0.0; // This species is considered converged now
-        }
     }
     n = 0.0; for (s=0; s<nsp; s++) n+=ns[s];
     *np = n;
@@ -300,6 +294,7 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
         }
         species_corrections(S,a,G0_RTs,U0_RTs,rho,T,ns,nsp,nel,dlnns,verbose);
         update_unknowns(S, dlnns, nsp, ns, &T, &n, verbose);
+        handle_trace_species_locking(a, n, nsp, nel, ns, bi0, dlnns, verbose);
         errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, dlnns, verbose);
 
         if (verbose>0){

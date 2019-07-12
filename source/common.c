@@ -13,6 +13,45 @@ const double TRACELIMIT=1e-8;   // Trace species limiter (for ns/n)
 const double tol=1e-9;
 const int attempts=50;
 
+// FIXME: Should bi0 be increased if the species get unlocked? Maybe you need to keep a bi00
+void handle_trace_species_locking(double* a, double n, int nsp, int nel, double* ns, double* bi0, double* dlnns, int verbose){
+    /*
+    Check for small species and lock appropriately
+    Inputs:
+        a      : elemental composition array [nel,nsp]
+        n      : total moles/mixture kg  
+        nsp    : total number of species
+        nel    : total  number of elements 
+    Outputs:
+        ns     : species moles/mixture kg [nsp]
+        bi0    : Initial Nuclear moles/mixture [nel]
+        dlnns : vector of species mole/mixture corrections [nsp]
+    */ 
+    int s,i;
+    double bi;
+
+    for (s=0; s<nsp; s++){
+        if (ns[s]/n<TRACELIMIT){
+            if (verbose>1) printf("    Locking species: %d (%f)\n", s, dlnns[s]);
+            ns[s] = 0.0;
+            dlnns[s] = 0.0; // This species is considered converged now
+        }
+    }
+
+    for (i=0; i<nel; i++){
+        bi = 0.0;
+        for (s=0; s<nsp; s++){
+            bi += a[i*nsp + s]*ns[s];
+            }
+
+        if (verbose>1) printf("new bi[%d]: %f\n",i,bi);
+        if (bi<1e-16) {
+            bi0[i] = 0.0;
+        }
+    }
+    return;
+}
+
 void composition_guess(double* a,double* M,double* X0,int nsp,int nel,double* ns,double* np,double* bi0){
     /*
     Unified setup of initial composition from mole fractions
@@ -32,20 +71,24 @@ void composition_guess(double* a,double* M,double* X0,int nsp,int nel,double* ns
 
     M0 = 0.0;
     for (s=0; s<nsp; s++) M0 += M[s]*X0[s];
+    for (s=0; s<nsp; s++) ns[s] = X0[s]/M0;
+
     for (i=0; i<nel; i++){
         bi0[i] = 0.0;
         for (s=0; s<nsp; s++){
             bi0[i] += a[i*nsp + s]*X0[s]/M0;
             }
     }
+
+
     n = 0.0;
-    for (s=0; s<nsp; s++) n += X0[s]/M0;
-    for (s=0; s<nsp; s++) ns[s] = n/nsp;
+    for (s=0; s<nsp; s++) n += ns[s];
+    //for (s=0; s<nsp; s++) ns[s] = n/nsp;   // Broaden initial guess? Possible use an fmax thing here
     *np = n;
 
     // Auto lock species with missing elements
     for (i=0; i<nel; i++){
-        if (bi0[i]<1e-16) {
+        if (bi0[i] < 1e-16) {
             for (s=0; s<nsp; s++) {
                 if (a[i*nsp + s]!=0) ns[s] = 0.0;
             }

@@ -156,7 +156,7 @@ int batch_pt(int N, double* p,double* T,double* X0,int nsp,int nel,double* lewis
         if (result!=0){
             printf("Error in batch_pt @ position: %d\n", i);
             printf("pi: %f Ti: %f \n", pi, Ti);
-            for (s=0; s<nsp; s++) printf("Xs[%d]=%f\n",s,X0i[s]);
+            for (s=0; s<nsp; s++) printf("Xs[%d]=%e\n",s,X0i[s]);
             printf("Retrying with debugging on\n");
             solve_pt(pi, Ti, X0i, nsp, nel, lewis, M, a, X1i, 1);
             return result;

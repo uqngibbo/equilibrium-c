@@ -24,7 +24,6 @@ ceq.o: ceq.c thermo.h rhou.h pt.h ceq.h
 ceq: thermo.o linalg.o common.o pt.o rhou.o ceq.o
 	$(CC) $(CFLAGS) -shared thermo.o linalg.o common.o pt.o rhou.o ceq.o -lm -o libceq.so
 
-
 install: 
 	cp libceq.so $(INSTALL_DIR)
 	sed "s+DBPATH='../thermo.inp'+DBPATH='$(INSTALL_DIR)/thermo.inp'+" pyeq.py > pyeq1.py
@@ -32,6 +31,7 @@ install:
 	cp pyeq2.py $(INSTALL_DIR)/pyeq.py
 	rm -rf pyeq1.py pyeq2.py
 	cp '../thermo.inp' $(INSTALL_DIR)
+	rm -rf $(INSTALL_DIR)/tests
 	cp -r ../tests $(INSTALL_DIR)
 
 moduletests: thermo.o linalg.o
