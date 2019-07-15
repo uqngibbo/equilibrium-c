@@ -83,7 +83,7 @@ void composition_guess(double* a,double* M,double* X0,int nsp,int nel,double* ns
 
     n = 0.0;
     for (s=0; s<nsp; s++) n += ns[s];
-    //for (s=0; s<nsp; s++) ns[s] = n/nsp;   // Broaden initial guess? Possible use an fmax thing here
+    for (s=0; s<nsp; s++) ns[s] = n/nsp;   // Broaden initial guess? Possible use an fmax thing here
     *np = n;
 
     // Auto lock species with missing elements

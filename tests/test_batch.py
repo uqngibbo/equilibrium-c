@@ -22,7 +22,20 @@ def test_pt():
     print("Target: ", Xst)
     return
 
+def test_u():
+    spnames = ['CO2', 'CO', 'O2']
+    T = array([2500.0, 2200.0])
+    Xs0 = array([[0.7, 0.2, 0.1],
+                 [0.7, 0.2, 0.1]])
+    elements, nsp, nel, lewisdata, a, M = pyeq.startup(spnames)
+    lib = pyeq.load_ceq_library()
+
+    print("Computing")
+    u = pyeq.batch_u(lib, T, Xs0, nsp, lewisdata, M)
+    print("Done: ", u)
+    return
 
 if __name__=='__main__':
     test_pt()
     print(' ')
+    test_u()

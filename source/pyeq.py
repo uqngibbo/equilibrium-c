@@ -209,5 +209,25 @@ def batch_rhou(lib, rho, u, Xs0, nsp, nel, lewis, M, a,verbose=0):
     if recode!=0: raise Exception("Equilibrium Calc Failed.")
     return Xs1, T
 
+def batch_u(lib, T, X, nsp, lewis, M):
+    """ Call c library to compute internal energy at fixed composition and temperature """
+    N, nspcheck = X.shape
+    if not X.flags['OWNDATA']: raise Exception("X Memory Error: Array must own its data")
+    if nspcheck!=nsp: raise Exception("nsp ({}) != X.shape[1] ({})".format(nsp, nspcheck))
+    if N!=T.size: raise Exception("T.size ({}) != X.shape[0] ({})".format(T.size, N))
+
+    u = zeros(T.shape)
+
+    c_double_p = POINTER(c_double)
+    Xp    = X.ctypes.data_as(c_double_p)
+    Tp    = T.ctypes.data_as(c_double_p)
+    up    = u.ctypes.data_as(c_double_p)
+    Mp    = M.ctypes.data_as(c_double_p)
+    lewisp= lewis.ctypes.data_as(c_double_p)
+
+    recode = lib.batch_u(N, Tp, Xp, nsp, lewisp, Mp, up)
+    if recode!=0: raise Exception("u calc failed.")
+    return u
+
 if __name__=='__main__':
     print("Called pyeq main!")

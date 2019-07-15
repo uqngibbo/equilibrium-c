@@ -225,7 +225,7 @@ int batch_u(int N, double* T, double* X, int nsp, double* lewis, double* M, doub
 
     for (i=0; i<N; i++){
         Ti = T[i];
-        Xi = Xi + i*nsp;
+        Xi = X + i*nsp;
         u[i] = get_u(Ti, Xi, nsp, lewis, M);
     }
     return 0;
