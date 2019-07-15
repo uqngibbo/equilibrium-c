@@ -34,7 +34,7 @@ install:
 	rm -rf $(INSTALL_DIR)/tests
 	cp -r ../tests $(INSTALL_DIR)
 
-moduletests: thermo.o linalg.o
+moduletests: thermo.c thermo.h thermo.o linalg.c linalg.h linalg.o
 	$(CC) thermo.c -D TEST -lm -o ../tests/testthermo
 	$(CC) linalg.c -D TEST -lm -o ../tests/testlinalg
 

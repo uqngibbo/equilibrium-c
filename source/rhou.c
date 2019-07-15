@@ -331,6 +331,7 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
     }
     
     if ((verbose>0)&&(errorcode==0)) printf("Converged in %d iter, error: %e\n", k, errorrms);
+    if ((verbose>0)&&(errorcode>0)) printf("Convergence failure in %d iter, error: %e\n", k, errorrms);
     // Compute output composition
     n = 0.0;
     for (s=0; s<nsp; s++) n += ns[s];
