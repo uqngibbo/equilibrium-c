@@ -14,10 +14,15 @@
 
 - Build Instructions
 
-    Add your preferred install directory to the INSTALL_DIR variable in the makefile. Then type:\
+    Add your preferred install directory to the INSTALL_DIR variable in the file source/makefile.\
+    Then type:\
     $ cd source\
     $ make ceq\
     $ make install
+    
+
+    Once install, add the location to your PYTHONPATH in your .bashrc file:\
+    export PYTHONPATH=${PYTHONPATH}:'/path/to/install/dir'
 
 
 - Use Instructions
