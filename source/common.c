@@ -83,7 +83,8 @@ void composition_guess(double* a,double* M,double* X0,int nsp,int nel,double* ns
 
     n = 0.0;
     for (s=0; s<nsp; s++) n += ns[s];
-    for (s=0; s<nsp; s++) ns[s] = n/nsp;   // Broaden initial guess? Possible use an fmax thing here
+    // This seemed to be a consistent cause of trouble. Maybe use fmax to prevent initial zeros?
+    //for (s=0; s<nsp; s++) ns[s] = n/nsp;   
     *np = n;
 
     // Auto lock species with missing elements
