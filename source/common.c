@@ -44,7 +44,7 @@ void handle_trace_species_locking(double* a, double n, int nsp, int nel, double*
             bi += a[i*nsp + s]*ns[s];
             }
 
-        if (verbose>1) printf("new bi[%d]: %f\n",i,bi);
+        if (verbose>1) printf("        new bi[%d]: %f\n",i,bi);
         if (bi<1e-16) {
             bi0[i] = 0.0;
         }
@@ -85,6 +85,7 @@ void composition_guess(double* a,double* M,double* X0,int nsp,int nel,double* ns
     for (s=0; s<nsp; s++) n += ns[s];
     // This seemed to be a consistent cause of trouble. Maybe use fmax to prevent initial zeros?
     //for (s=0; s<nsp; s++) ns[s] = n/nsp;   
+    for (s=0; s<nsp; s++) ns[s] = fmax(ns[s], n*TRACELIMIT*2.0);
     *np = n;
 
     // Auto lock species with missing elements

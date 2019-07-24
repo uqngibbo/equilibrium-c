@@ -94,6 +94,37 @@ double get_u(double T, double* X, int nsp, double* lewis, double* M){
     return u;
 }
 
+double get_h(double T, double* X, int nsp, double* lewis, double* M){
+    /*
+    Compute thermal equilibrium h from known composition and primitives
+    Inputs:
+        T     : Temperature (K)
+        X     : Composition [nsp]
+        nsp   : number of species 
+        lewis : Nasa Lewis Thermodynamic Database Data [nsp*3*9]
+        M     : Molar Mass of each species (kg/mol) [nsp]
+        verbose: print debugging information
+
+    Output:
+        h : enthalpy per unit mass
+    */
+    int s;
+    double Mmix, h, ns, H0_RTs;
+    double* lp;
+
+    Mmix = 0.0; for (s=0; s<nsp; s++) Mmix+=X[s]*M[s];
+    
+    h = 0.0;
+    for (s=0; s<nsp; s++){
+        ns = X[s]/Mmix;
+        lp = lewis + 9*3*s;
+        H0_RTs = compute_H0_RT(T, lp);
+        h += ns*H0_RTs*Ru*T;
+    }
+    return h;
+}
+
+
 double get_cp(double T, double* X, int nsp, double* lewis, double* M){
     /*
     Compute thermal equilibrium cp from known composition and primitives

@@ -43,13 +43,15 @@ def test_rhou():
     #U0st= [(sp.H0onRT(T) - 1.0)*Ru*T for sp in species]
     #ut = sum(njt*U0jt for njt,U0jt in zip(nst,U0st))
     ut = pyeq.get_u(lib, T, Xst, nsp, lewisdata, M)
+    ht = pyeq.get_h(lib, T, Xst, nsp, lewisdata, M)
 
     print("a",a.flatten())
     print("ut",ut)
+    print("ht",ht)
     print("nst",nst)
     print("rhot",rhot)
     print("Computing")
-    Xs1, Teq = pyeq.rhou(lib, rhot, ut, Xs0, nsp, nel, lewisdata, M, a, 1)
+    Xs1, Teq = pyeq.rhou(lib, rhot, ut, Xs0, nsp, nel, lewisdata, M, a, 2)
     print("Done X: ", Xs1)
     print("Target: ", Xst)
     print("Done T: ", T)

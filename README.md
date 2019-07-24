@@ -28,3 +28,7 @@
 - Use Instructions
 
     The code is accessed through a python script that handles reading of data, memory management, and initialisation. All of this data is then passed to a set of c routines that do most of the actual work. See examples in the "tests" directory.
+
+- Licensing
+
+    This program is MIT licensed, which allows you do to almost anything with it except pretend that you wrote it or mess with the license itself. See the mit.txt file for details.
