@@ -206,7 +206,7 @@ static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* T
     return;
 }
 
-double temperature_guess(int nsp, double u, double* M, double* X0, double* lewis){
+static double temperature_guess(int nsp, double u, double* M, double* X0, double* lewis){
     /*
     Guess a first iteration temperature assuming constant Cv from 298 K
     Inputs:
@@ -295,10 +295,10 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
         species_corrections(S,a,G0_RTs,U0_RTs,rho,T,ns,nsp,nel,dlnns,verbose);
         update_unknowns(S, dlnns, nsp, ns, &T, &n, verbose);
         handle_trace_species_locking(a, n, nsp, nel, ns, bi0, dlnns, verbose);
-        errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, dlnns, verbose);
+        errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, neq, dlnns);
 
         if (verbose>0){
-            printf("iter %2d: [%f]",k,n);
+            printf("iter %2d: [%f]",k,T);
             for (s=0; s<nsp; s++) printf(" %f",ns[s]);
             printf("  (%e)\n", errorrms);
         }

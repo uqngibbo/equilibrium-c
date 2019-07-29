@@ -44,8 +44,8 @@ void handle_trace_species_locking(double* a, double n, int nsp, int nel, double*
             bi += a[i*nsp + s]*ns[s];
             }
 
-        if (verbose>1) printf("        new bi[%d]: %f\n",i,bi);
         if (bi<1e-16) {
+            if (verbose>1) printf("        bi[%d]: %f locking b90\n",i,bi);
             bi0[i] = 0.0;
         }
     }
@@ -122,39 +122,48 @@ int all_but_one_species_are_trace(int nsp, double* ns){
     }
 }
 
-double constraint_errors(double* S, double* a,double* bi0,double* ns,int nsp,int nel,double* dlnns,int verbose){
+double constraint_errors(double* S,double* a,double* bi0,double* ns,int nsp,int nel,int neq,double* dlnns){
     /*
     Unified computation of current error to determine whether to break loop
     Inputs:
-        S      : Corrections  [nel+1]
+        S      : Corrections  [neq]
         a      : elemental composition array [nel,nsp]
         bi0    : Initial Nuclear moles/mixture [nel]
         ns     : species moles/mixture kg [nsp]
         nsp    : total number of species
         nel    : total  number of elements 
+        neq    : total number of equations 
         dllns  : raw change in log(ns) [nsp]
-        verbose: verbose flag to print debugging information
 
     Outputs:
         unified error number (method as determined by this function)
     */ 
-    int s,i;
+    int s,i,n,nS;
     double bi,errorrms,error;
 
     // Compute the change in current variables (note this is the unlimited dlnns! not the real change)
     errorrms = 0.0;
+    n = 0;
+    nS = neq-nel;
 
-    errorrms += S[0]*S[0]; // Either dlnT or dlnn
+    for (i=0; i<nS; i++){
+        errorrms += S[i]*S[i];
+        n += 1;
+    }
 
-    for (s=0; s<nsp; s++) errorrms += dlnns[s]*dlnns[s];
+    for (s=0; s<nsp; s++){
+        errorrms += dlnns[s]*dlnns[s];
+        n += 1;
+    }
 
     for (i=0; i<nel; i++) {
         bi = 0.0;
         for (s=0; s<nsp; s++) bi += a[i*nsp + s]*ns[s];
         error = bi - bi0[i];
         errorrms += error*error;
+        n += 1;
     }
-    errorrms /= (nsp+nel+1);
+    errorrms /= n; // Implicit typecast, is this a good idea?
     errorrms = sqrt(errorrms);
     return errorrms;
 }

@@ -251,7 +251,7 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         species_corrections(S, a, G0_RTs, p, n, ns, nsp, nel, dlnns, verbose);
         update_unknowns(S, dlnns, nsp, nel, ns, &n, verbose);
         handle_trace_species_locking(a, n, nsp, nel, ns, bi0, dlnns, verbose);
-        errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, dlnns, verbose);
+        errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, neq, dlnns);
 
         if (verbose>0){
             printf("iter %2d: [%f]",k,n);
