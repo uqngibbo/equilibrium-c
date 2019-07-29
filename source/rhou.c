@@ -305,7 +305,7 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
 
         // Exit loop if all but one species are trace 
         i = all_but_one_species_are_trace(nsp, ns);
-        if (i>0){
+        if (i>=0){
             if (verbose>0) printf("Pseudo convergence! Remaining species: (%d)\n", i);
             n = 1.0/M[i];
             ns[i] = n;
