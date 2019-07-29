@@ -108,6 +108,7 @@ def load_ceq_library():
     lib.rhou.restype = c_int
     lib.get_u.restype = c_double
     lib.get_h.restype = c_double
+    lib.get_cp.restype = c_double
     lib.batch_pt.restype = c_int
     lib.batch_rhou.restype = c_int
     lib.batch_u.restype = c_int
@@ -173,6 +174,18 @@ def get_h(lib, T, X, nsp, lewis, M):
 
     h = lib.get_h(Td, Xp, nsp, lewisp, Mp)
     return h
+
+def get_cp(lib, T, X, nsp, lewis, M):
+    """ Call c library to compute internal energy at fixed composition and temperature """
+    Td = c_double(T)
+
+    c_double_p = POINTER(c_double)
+    Xp    = X.ctypes.data_as(c_double_p)
+    Mp    = M.ctypes.data_as(c_double_p)
+    lewisp= lewis.ctypes.data_as(c_double_p)
+
+    cp = lib.get_cp(Td, Xp, nsp, lewisp, Mp)
+    return cp
 
 def batch_pt(lib, p, T, Xs0, nsp, nel, lewis, M, a,verbose=0):
     """ Call c library to compute equilibrium concentrations at fixed p, T """
