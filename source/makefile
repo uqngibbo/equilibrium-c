@@ -11,18 +11,20 @@ linalg.o: linalg.c linalg.h
 common.o: common.c common.h
 	$(CC) $(CFLAGS) -c common.c
 
-rhou.o: rhou.c thermo.h linalg.h common.h rhou.h
-	$(CC) $(CFLAGS) -c rhou.c
-
 pt.o: pt.c thermo.h linalg.h common.h pt.h
 	$(CC) $(CFLAGS) -c pt.c
 
-ceq.o: ceq.c thermo.h rhou.h pt.h ceq.h
+rhou.o: rhou.c thermo.h linalg.h common.h rhou.h
+	$(CC) $(CFLAGS) -c rhou.c
+
+ps.o: ps.c thermo.h linalg.h common.h ps.h
+	$(CC) $(CFLAGS) -c ps.c
+
+ceq.o: ceq.c thermo.h pt.h rhou.h ps.h ceq.h
 	$(CC) $(CFLAGS) -c ceq.c
 
-
-ceq: thermo.o linalg.o common.o pt.o rhou.o ceq.o
-	$(CC) $(CFLAGS) -shared thermo.o linalg.o common.o pt.o rhou.o ceq.o -lm -o libceq.so
+ceq: thermo.o linalg.o common.o pt.o rhou.o ps.o ceq.o
+	$(CC) $(CFLAGS) -shared thermo.o linalg.o common.o pt.o rhou.o ps.o ceq.o -lm -o libceq.so
 
 install: 
 	cp libceq.so $(INSTALL_DIR)

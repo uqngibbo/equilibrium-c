@@ -14,9 +14,9 @@
 
 - Build Requirements
 
-    python3\
-    python3-numpy\
-    gcc
+    + python3\
+    + python3-numpy\
+    + gcc
 
 - Build Instructions
 
@@ -27,7 +27,7 @@
     $ make install
     
 
-    Once install, add the location to your PYTHONPATH in your .bashrc file:\
+    Once installed, add the location to your PYTHONPATH in your .bashrc file:\
     export PYTHONPATH=${PYTHONPATH}:'/path/to/install/dir'
 
 

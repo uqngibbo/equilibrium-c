@@ -124,7 +124,6 @@ double get_h(double T, double* X, int nsp, double* lewis, double* M){
     return h;
 }
 
-
 double get_cp(double T, double* X, int nsp, double* lewis, double* M){
     /*
     Compute thermal equilibrium cp from known composition and primitives
@@ -155,6 +154,35 @@ double get_cp(double T, double* X, int nsp, double* lewis, double* M){
     return cp;
 }
 
+double get_s(double T, double* X, int nsp, double* lewis, double* M){
+    /*
+    Compute specific entropy from known composition and primitives
+    Inputs:
+        T     : Temperature (K)
+        X     : Composition [nsp]
+        nsp   : number of species 
+        lewis : Nasa Lewis Thermodynamic Database Data [nsp*3*9]
+        M     : Molar Mass of each species (kg/mol) [nsp]
+        verbose: print debugging information
+
+    Output:
+        s_ : specific entropy (J/K)
+    */
+    int s;
+    double Mmix, ns, s_, S0_Rs;
+    double* lp;
+
+    Mmix = 0.0; for (s=0; s<nsp; s++) Mmix+=X[s]*M[s];
+    
+    s_ = 0.0;
+    for (s=0; s<nsp; s++){
+        ns = X[s]/Mmix;
+        lp = lewis + 9*3*s;
+        S0_Rs = compute_S0_R(T, lp);
+        s_ += ns*S0_Rs*Ru;
+    }
+    return s_;
+}
 int batch_pt(int N, double* p,double* T,double* X0,int nsp,int nel,double* lewis,double* M,double* a,
              double* X1, int verbose){
     /*
