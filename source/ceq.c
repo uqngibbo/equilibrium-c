@@ -19,6 +19,7 @@ C library for equilibrium chemistry calculations
 #include "thermo.h"
 #include "pt.h"
 #include "rhou.h"
+#include "ps.h"
 #include "ceq.h"
 
 
@@ -61,7 +62,29 @@ int rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,double* M,
         X1 : Equilibrium Mole Fraction [nsp]  
         T  : Equilibrium Temperature 
     */
-    return solve_rhou(rho, u, X0,nsp,nel, lewis, M, a, X1, T, verbose);
+    return solve_rhou(rho, u, X0, nsp, nel, lewis, M, a, X1, T, verbose);
+}
+
+int ps(double pt,double st,double* X0,int nsp,int nel,double* lewis,double* M,double* a,
+         double* X1, double* T, int verbose){
+    /*
+    Compute the equilibrium composition X1 at a fixed pressure and specific entropy 
+    Inputs:
+        pt    : target pressure (Pa)
+        st    : target specific entropy (J/kg)
+        X0    : Intial Mole fractions [nsp]
+        nsp   : number of species 
+        nel   : number of elements 
+        lewis : Nasa Lewis Thermodynamic Database Data [nsp*3*9]
+        M     : Molar Mass of each species (kg/mol) [nsp]
+        a     : elemental composition array [nel,nsp]
+        verbose: print debugging information
+
+    Output:
+        X1 : Equilibrium Mole Fraction [nsp]  
+        T  : Equilibrium Temperature 
+    */
+    return solve_ps(pt, st, X0, nsp, nel, lewis, M, a, X1, T, verbose);
 }
 
 double get_u(double T, double* X, int nsp, double* lewis, double* M){

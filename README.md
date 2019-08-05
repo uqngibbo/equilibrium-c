@@ -14,8 +14,8 @@
 
 - Build Requirements
 
-    + python3\
-    + python3-numpy\
+    + python3
+    + python3-numpy
     + gcc
 
 - Build Instructions

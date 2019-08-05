@@ -152,6 +152,26 @@ def rhou(lib, rho, u, Xs0, nsp, nel, lewis, M, a,verbose=0):
     T = Tp.value
     return Xs1, T
 
+def ps(lib, pt, st, Xs0, nsp, nel, lewis, M, a,verbose=0):
+    """ Call c library to compute equilibrium concentrations at fixed p, s """
+    Xs1 = zeros(Xs0.shape)
+    pp = c_double(pt)
+    sp = c_double(st)
+    Tp = c_double()
+    Tref = byref(Tp)
+
+    c_double_p = POINTER(c_double)
+    Xs0p  = Xs0.ctypes.data_as(c_double_p)
+    Mp    = M.ctypes.data_as(c_double_p)
+    lewisp= lewis.ctypes.data_as(c_double_p)
+    ap    = a.ctypes.data_as(c_double_p)
+    Xs1p  = Xs1.ctypes.data_as(c_double_p)
+
+    recode = lib.rhou(pp, sp, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p, Tref, verbose)
+    if recode!=0: raise Exception("Equilibrium Calc Failed.")
+    T = Tp.value
+    return Xs1, T
+
 def get_u(lib, T, X, nsp, lewis, M):
     """ Call c library to compute internal energy at fixed composition and temperature """
     Td = c_double(T)
@@ -189,7 +209,7 @@ def get_cp(lib, T, X, nsp, lewis, M):
     return cp
 
 def get_s(lib, T, X, nsp, lewis, M):
-    """ Call c library to compute internal energy at fixed composition and temperature """
+    """ Call c library to compute internal entropy at fixed composition and temperature """
     Td = c_double(T)
 
     c_double_p = POINTER(c_double)

@@ -22,8 +22,8 @@ C library for equilibrium chemistry calculations
 #include "ps.h"
 
 static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double T,double n,double* ns,
-                              int nsp, int nel,double* A, double* B, double* G0_RTs, double* H0_RTs,
-                              double* Cp0_Rs, double* S0_Rs,  double* lewis){
+                              int nsp, int nel,double* A, double* B, double* mu_RTs, double* H_RTs,
+                              double* Cp_Rs, double* S_Rs,  double* lewis){
     /*
     Construct Iteration Matrix for reduced Newton Rhapson step, (eqn 2.24 2.28 2.26 from cea_I)
     Inputs:
@@ -36,10 +36,10 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
         ns     : current guess of species mixture weights (mol/kg) [nsp]
         nsp    : total number of species
         nel    : total  number of elements 
-        G0_RTs : Gibbs free energy of each species, divided by RT [nsp]
-        H0_RTs : Molar enthalpy of each species, divided by RT [nsp]
-        Cp0_Rs : Molar specific heat @ constant pressure of each species, divided by Ru [nsp]
-        S0_Rs  : Molar entropy at standard pressure of each species, divided by Ru [nsp]
+        mu_RTs : Chemical potential of each species, divided by RT [nsp]
+        H_RTs  : Molar enthalpy of each species, divided by RT [nsp]
+        Cp_Rs  : Molar specific heat @ constant pressure of each species, divided by Ru [nsp]
+        S_Rs   : Molar entropy at of each species, divided by Ru [nsp]
         lewis  : Lewis thermodynamic data of each species
     Outputs:
         A      : Jacobian Inversion Matrix [neq,neq]
@@ -51,7 +51,7 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
     */
     double lnns, lnn, lnp, akjaijnj, akjnjmuj, mus_RTj, bk;
     double akjnjHj, nsHs, aijnjSj, njSj, njCpj, njHjSj, njSjmuj;
-    double nss, nsmus, coeffsum, sk;
+    double nss, nsmus, coeffsum, sk, G0_RTs, S0_Rs;
     int k,neq,i,j,s,nep;
     double *lp;
     neq = nel+2;
@@ -61,14 +61,17 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
     sk = 0.0;
     for (s=0; s<nsp; s++){
         lp = lewis + 9*3*s;
-        G0_RTs[s] = compute_G0_RT(T, lp);
-        H0_RTs[s] = compute_H0_RT(T, lp);
-        Cp0_Rs[s] = compute_Cp0_R(T, lp);
-        S0_Rs[s]  = compute_S0_R(T, lp);
-        sk += ns[s]*S0_Rs[s]*Ru;
+        H_RTs[s] = compute_H0_RT(T, lp);
+        Cp_Rs[s] = compute_Cp0_R(T, lp);
+        G0_RTs = compute_G0_RT(T, lp);
+        S0_Rs  = compute_S0_R(T, lp);                    // entropy at one BAR
+
+        mu_RTs[s] = G0_RTs + log(ns[j]) - lnn + lnp;
+        S_Rs[s]   = S0_Rs  - log(ns[s]) + lnn - lnp;     // entropy at current pressure
+        sk += ns[s]*S_Rs[s]*Ru; 
     }
 
-    // FIXME: Consider having a function for each of these rather than one huge one
+    // FIXME: Consider having one function for each of these rather than a single huge one
     // Equation 2.24: k-> equation index, i-> variable index
     for (k=0; k<nel; k++){
 
@@ -91,14 +94,14 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
         }
 
         akjnjHj = 0.0;
-        for (j=0; j<nsp; j++) akjnjHj += a[k*nsp+j]*ns[j]*H0_RTs[j];
+        for (j=0; j<nsp; j++) akjnjHj += a[k*nsp+j]*ns[j]*H_RTs[j];
         A[k*neq + 1] = akjnjHj;  // dlnT entry
 
         akjnjmuj = 0.0;
         for (j=0; j<nsp; j++){
             if (ns[j]==0.0) continue;
-            mus_RTj = G0_RTs[j] + log(ns[j]) - lnn + lnp;
-            akjnjmuj += a[k*nsp+j]*ns[j]*mus_RTj;
+            //mus_RTj = G0_RTs[j] + log(ns[j]) - lnn + lnp;
+            akjnjmuj += a[k*nsp+j]*ns[j]*mu_RTs[j];
         }
         B[k] = bi0[k] - bk + akjnjmuj; // rhs
     }
@@ -113,12 +116,12 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
     nss = 0.0;
     nsmus = 0.0;
     nsHs = 0.0;
-    for (j=0; j<nsp; j++){
-        if (ns[j]==0.0) continue;
-        mus_RTj = G0_RTs[j] + log(ns[j]) - lnn + lnp; // I guess its okay to compute this again
-        nss += ns[j];
-        nsmus += ns[j]*mus_RTj;
-        nsHs += ns[j]*H0_RTs[j];
+    for (s=0; s<nsp; s++){
+        if (ns[s]==0.0) continue;
+        //mus_RTj = G0_RTs[s] + log(ns[s]) - lnn + lnp;
+        nss += ns[s];
+        nsmus += ns[s]*mu_RTs[s];
+        nsHs += ns[s]*H_RTs[s];
     }
     A[nel*neq + 0] = nss - n; // dlnn entry
     A[nel*neq + 1] = nsHs;     // dlnT entry
@@ -130,7 +133,7 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
         aijnjSj = 0.0;
 
         for (j=0; j<nsp; j++){
-            aijnjSj = a[i*nsp+j]*ns[j]*S0_Rs[j];
+            aijnjSj = a[i*nsp+j]*ns[j]*S_Rs[j];
         }
         A[nep*nel + i+2] = aijnjSj; // pii entry, i+2 because dlnn, dlnT come first
     }
@@ -142,12 +145,12 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
     njSjmuj = 0.0;
     for (j=0; j<nsp; j++){
         if (ns[j]==0.0) continue;
-        mus_RTj = G0_RTs[j] + log(ns[j]) - lnn + lnp; // It might not be okay to compute this three times
+        //mus_RTj = G0_RTs[j] + log(ns[j]) - lnn + lnp;
 
-        njSj    += ns[j]*S0_Rs[j];
-        njCpj   += ns[j]*Cp0_Rs[j];
-        njHjSj  += ns[j]*H0_RTs[j]*S0_Rs[j];
-        njSjmuj += ns[j]*S0_Rs[j]*mus_RTj;
+        njSj    += ns[j]*S_Rs[j];
+        njCpj   += ns[j]*Cp_Rs[j];
+        njHjSj  += ns[j]*H_RTs[j]*S_Rs[j];
+        njSjmuj += ns[j]*S_Rs[j]*mu_RTs[s];
     }
     A[nep*nel + 0] = njSj; // dlnn entry
     A[nep*nel + 1] = njCpj + njHjSj; // dnlT entry
@@ -164,7 +167,7 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
     return;
 }
 
-static void species_corrections(double* S,double* a,double* G0_RTs,double* H0_RTs, double p,double n,
+static void species_corrections(double* S,double* a,double* mu_RTs,double* H_RTs, double p,double n,
                                 double* ns, int nsp, int nel, double* dlnns, int verbose){
     /*
     Compute delta_log(ns) from the reduced iteration equations from 
@@ -172,8 +175,8 @@ static void species_corrections(double* S,double* a,double* G0_RTs,double* H0_RT
     Inputs:
         S      : Corrections (dlog(n), pi1, pi2, pi3, ... , dlog(T)) [nel+1]
         a      : elemental composition array [nel,nsp]
-        G0_RTs : Gibbs free energy of each species, divided by RT [nsp]
-        H0_RTs : Molar enthalpy of each species, divided by RT [nsp]
+        mu_RTs : Chemical potential of each species, divided by RT [nsp]
+        H_RTs  : Molar enthalpy of each species, divided by RT [nsp]
         p      : pressure 
         n      : total moles/mixture kg 
         ns     : species moles/mixture kg [nsp]
@@ -183,7 +186,7 @@ static void species_corrections(double* S,double* a,double* G0_RTs,double* H0_RT
     Outputs:
         dllns : change in log(ns) [nsp]
     */
-    double dlnn,aispii,mu_RTs,lnn,lnp,dlnT;
+    double dlnn,aispii,lnn,lnp,dlnT;
     int s,i;
     dlnn = S[0];
     dlnT = S[1];
@@ -192,26 +195,27 @@ static void species_corrections(double* S,double* a,double* G0_RTs,double* H0_RT
 
     for (s=0; s<nsp; s++) {
         if (ns[s]==0.0) { dlnns[s] = 0.0; continue;}
-        mu_RTs = G0_RTs[s] + log(ns[s]) - lnn + lnp; // Computing this again reeeeee
+        //mu_RTs = G0_RTs[s] + log(ns[s]) - lnn + lnp;
 
         aispii = 0.0;
         for (i=0; i<nel; i++){
             aispii += a[i*nsp+s]*S[i+2]; // S[i+2] = pi_i, the lagrange multiplier
         }
-        dlnns[s] = -mu_RTs + dlnn + aispii + H0_RTs[s]*dlnT;
+        dlnns[s] = -mu_RTs[s] + dlnn + aispii + H_RTs[s]*dlnT;
         //printf("    dlnns[%d] = %f (%f %f %f)\n", s, dlnns[s], -mu_RTs, dlnn, aispii);
     }
     return; 
 }
 
-static void handle_singularity(double* S,double* a,double* G0_RTs,double* H0_RTs,double p,double n,
+static void handle_singularity(double* S,double* a,double* mu_RTs,double* H_RTs,double p,double n,
                                double* ns, int nsp, int nel, double* dlnns, int verbose){
     /*
     Handle crash by possibly resetting species compositions to fix
     Inputs:
         S      : Corrections array (pi1, pi2, pi3 ... dlog(n) [nel+1]
         a      : elemental composition array [nel,nsp]
-        G0_RTs : Gibbs free energy of each species, divided by RT [nsp]
+        mu_RTs : Chemical potential of each species, divided by RT [nsp]
+        H_RTs  : Molar enthalpy of each species, divided by RT [nsp]
         p      : pressure 
         n      : total moles/mixture kg 
         ns     : species moles/mixture kg [nsp]
@@ -227,8 +231,8 @@ static void handle_singularity(double* S,double* a,double* G0_RTs,double* H0_RTs
     for (s=0; s<nsp; s++){
         if (ns[s]!=0.0) continue;  // Ignore non trace species
 
-        ns[s] = fmax(RESET*n*TRACELIMIT, ns[s]); // Reset trace trace species to a small but finite number
-        species_corrections(S,a,G0_RTs,H0_RTs,p,n,ns,nsp,nel,dlnns,0); // approximately predict dlnns
+        ns[s] = fmax(RESET*n*TRACELIMIT, ns[s]); // Reset trace trace species to small but finite number
+        species_corrections(S,a,mu_RTs,H_RTs,p,n,ns,nsp,nel,dlnns,0); // approximately predict dlnns
 
         if (dlnns[s]<0.0) ns[s] = 0.0; // Re-zero any species with negative predicted dlnns
         if (verbose>1) printf("   faux dlnns: %f changed to: %e \n", dlnns[s], ns[s]);
@@ -314,7 +318,7 @@ static double temperature_guess(int nsp, double st, double pt, double n, double*
         nls+= nss*log(nss/n);
     }
 
-    T = 298.15*exp((st + s0 + Ru*(nls+ n*log(pt/101.35e3)))/cp); // See grey book 28/07/2019
+    T = 298.15*exp((st + s0 + Ru*(nls+ n*log(pt/1e5)))/cp); // See grey book 28/07/2019
     T = fmin(fmax(T, 200.0),20000.0); // Limit in case of bad initial state.
     return T;
 }
@@ -338,7 +342,7 @@ int solve_ps(double pt,double st,double* X0,int nsp,int nel,double* lewis,double
         X1  : Equilibrium Mole Fraction [nsp]  
         Teq: Equilibrium Temperature 
     */
-    double *A, *B, *S, *G0_RTs, *H0_RTs, *S0_Rs, *Cp0_Rs, *ns, *bi0, *dlnns; // Dynamic arrays
+    double *A, *B, *S, *mu_RTs, *H_RTs, *S_Rs, *Cp_Rs, *ns, *bi0, *dlnns; // Dynamic arrays
     int neq,s,i,k,errorcode,ntrace;
     double M0,n,M1,errorL2,errorL22,thing,T,errorrms;
 
@@ -347,10 +351,10 @@ int solve_ps(double pt,double st,double* X0,int nsp,int nel,double* lewis,double
     A     = (double*) malloc(sizeof(double)*neq*neq); // Iteration Jacobian
     B     = (double*) malloc(sizeof(double)*neq);     // Iteration RHS
     S     = (double*) malloc(sizeof(double)*neq);     // Iteration unknown vector
-    G0_RTs= (double*) malloc(sizeof(double)*nsp);     // Species Gibbs Free Energy
-    H0_RTs= (double*) malloc(sizeof(double)*nsp);     // Species Molar Enthalpy 
-    S0_Rs = (double*) malloc(sizeof(double)*nsp);     // Species Molar Entropy
-    Cp0_Rs= (double*) malloc(sizeof(double)*nsp);     // Species Specific Heat @ Const. pressure 
+    mu_RTs= (double*) malloc(sizeof(double)*nsp);     // Species chemical potential
+    H_RTs = (double*) malloc(sizeof(double)*nsp);     // Species Molar Enthalpy 
+    S_Rs  = (double*) malloc(sizeof(double)*nsp);     // Species Molar Entropy
+    Cp_Rs = (double*) malloc(sizeof(double)*nsp);     // Species Specific Heat @ Const. pressure 
     ns    = (double*) malloc(sizeof(double)*nsp);     // Species moles/mixture mass
     bi0   = (double*) malloc(sizeof(double)*nel);     // starting composition coefficients
     dlnns = (double*) malloc(sizeof(double)*nsp);     // raw change in log(ns)
@@ -361,13 +365,13 @@ int solve_ps(double pt,double st,double* X0,int nsp,int nel,double* lewis,double
 
     // Begin Iterations
     for (k=0; k<attempts; k++){
-        Assemble_Matrices(a,bi0,pt,st,T,n,ns,nsp,nel,A,B,G0_RTs,H0_RTs,Cp0_Rs,S0_Rs,lewis);
+        Assemble_Matrices(a,bi0,pt,st,T,n,ns,nsp,nel,A,B,mu_RTs,H_RTs,Cp_Rs,S_Rs,lewis);
         errorcode = solve_matrix(A, B, S, neq);
         if (errorcode!=0) {
-            handle_singularity(S,a,G0_RTs,H0_RTs,pt,n,ns,nsp,nel,dlnns,verbose);
+            handle_singularity(S,a,mu_RTs,H_RTs,pt,n,ns,nsp,nel,dlnns,verbose);
             continue;
         }
-        species_corrections(S,a,G0_RTs,H0_RTs,pt,n,ns,nsp,nel,dlnns,verbose); // FIXME? Using old n,T
+        species_corrections(S,a,mu_RTs,H_RTs,pt,n,ns,nsp,nel,dlnns,verbose); // FIXME? Using old n,T
         update_unknowns(S,dlnns,nsp,nel,ns,&n,&T,verbose);
         handle_trace_species_locking(a, n, nsp, nel, ns, bi0, dlnns, verbose);
         errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, neq, dlnns);
@@ -417,10 +421,10 @@ int solve_ps(double pt,double st,double* X0,int nsp,int nel,double* lewis,double
     free(A);
     free(B);
     free(S);     
-    free(G0_RTs);
-    free(H0_RTs);
-    free(S0_Rs);
-    free(Cp0_Rs);
+    free(mu_RTs);
+    free(H_RTs);
+    free(S_Rs);
+    free(Cp_Rs);
     free(ns);
     free(bi0);
     free(dlnns);
