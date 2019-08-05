@@ -66,8 +66,19 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
         G0_RTs = compute_G0_RT(T, lp);
         S0_Rs  = compute_S0_R(T, lp);                    // entropy at one BAR
 
-        mu_RTs[s] = G0_RTs + log(ns[j]) - lnn + lnp;
-        S_Rs[s]   = S0_Rs  - log(ns[s]) + lnn - lnp;     // entropy at current pressure
+        if (ns[s]!=0.0){
+            mu_RTs[s] = G0_RTs + log(ns[s]) - lnn + lnp;
+            S_Rs[s]   = S0_Rs  - log(ns[s]) + lnn - lnp;     // entropy at current pressure
+        }
+        else {
+            // Triggered if ns[s]==0. Note that in this situation mu_RTs and S_Rs are actually
+            // equal to log(0.0) which is negative infinity. However, mu_RTs and S_Rs are always
+            // multiplied by zero later, and x*log(x) -> 0 as x->0, so we can set them to whatever
+            // to keep the floating point math happy
+            mu_RTs[s] = 0.0; 
+            S_Rs[s]   = 0.0;
+        }
+
         sk += ns[s]*S_Rs[s]*Ru; 
     }
 
@@ -77,13 +88,17 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
 
         if (bi0[k]<1e-16) { // Check for missing missing element equations and Lock
             for (i=0; i<neq; i++) A[k*neq+i] = 0.0;
-            A[k*neq + k+1] = 1.0;   
+            A[k*neq + k+2] = 1.0;  
             B[k] = 0.0;
             continue;
         }
 
         bk = 0.0; for (s=0; s<nsp; s++) bk += a[k*nsp + s]*ns[s];
         A[k*neq + 0] = bk;       // dlnn entry
+
+        akjnjHj = 0.0;
+        for (j=0; j<nsp; j++) akjnjHj += a[k*nsp+j]*ns[j]*H_RTs[j];
+        A[k*neq + 1] = akjnjHj;  // dlnT entry
 
         for (i=0; i<nel; i++){
             akjaijnj = 0.0;
@@ -93,13 +108,9 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
             A[k*neq + i+2] = akjaijnj; // pii entry, i+2 because dlnn, dlnT come first
         }
 
-        akjnjHj = 0.0;
-        for (j=0; j<nsp; j++) akjnjHj += a[k*nsp+j]*ns[j]*H_RTs[j];
-        A[k*neq + 1] = akjnjHj;  // dlnT entry
-
         akjnjmuj = 0.0;
         for (j=0; j<nsp; j++){
-            if (ns[j]==0.0) continue;
+            //if (ns[s]==0.0) continue;
             //mus_RTj = G0_RTs[j] + log(ns[j]) - lnn + lnp;
             akjnjmuj += a[k*nsp+j]*ns[j]*mu_RTs[j];
         }
@@ -117,7 +128,7 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
     nsmus = 0.0;
     nsHs = 0.0;
     for (s=0; s<nsp; s++){
-        if (ns[s]==0.0) continue;
+        //if (ns[s]==0.0) continue;
         //mus_RTj = G0_RTs[s] + log(ns[s]) - lnn + lnp;
         nss += ns[s];
         nsmus += ns[s]*mu_RTs[s];
@@ -144,13 +155,13 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
     njHjSj = 0.0;
     njSjmuj = 0.0;
     for (j=0; j<nsp; j++){
-        if (ns[j]==0.0) continue;
+        //if (ns[j]==0.0) continue;
         //mus_RTj = G0_RTs[j] + log(ns[j]) - lnn + lnp;
 
         njSj    += ns[j]*S_Rs[j];
         njCpj   += ns[j]*Cp_Rs[j];
         njHjSj  += ns[j]*H_RTs[j]*S_Rs[j];
-        njSjmuj += ns[j]*S_Rs[j]*mu_RTs[s];
+        njSjmuj += ns[j]*S_Rs[j]*mu_RTs[j];
     }
     A[nep*nel + 0] = njSj; // dlnn entry
     A[nep*nel + 1] = njCpj + njHjSj; // dnlT entry
@@ -319,6 +330,8 @@ static double temperature_guess(int nsp, double st, double pt, double n, double*
     }
 
     T = 298.15*exp((st + s0 + Ru*(nls+ n*log(pt/1e5)))/cp); // See grey book 28/07/2019
+    printf("s0: %e\n", s0);
+    //T = 298.15*exp((st + Ru*(nls+ n*log(pt/1e5)))/cp); // See grey book 28/07/2019
     T = fmin(fmax(T, 200.0),20000.0); // Limit in case of bad initial state.
     return T;
 }
@@ -361,7 +374,7 @@ int solve_ps(double pt,double st,double* X0,int nsp,int nel,double* lewis,double
 
     composition_guess(a, M, X0, nsp, nel, ns, &n, bi0);
     T = temperature_guess(nsp, st, pt, n, ns, lewis);
-    if (verbose>0) printf("Guess T: %f\n", T);
+    if (verbose>0) printf("Guess T from ps: %f\n", T);
 
     // Begin Iterations
     for (k=0; k<attempts; k++){

@@ -177,9 +177,9 @@ double get_cp(double T, double* X, int nsp, double* lewis, double* M){
     return cp;
 }
 
-double get_s(double T, double* X, int nsp, double* lewis, double* M){
+double get_s0(double T, double* X, int nsp, double* lewis, double* M){
     /*
-    Compute specific entropy from known composition and primitives
+    Compute specific entropy @ 1 BAR from known composition and primitives
     Inputs:
         T     : Temperature (K)
         X     : Composition [nsp]
@@ -189,22 +189,22 @@ double get_s(double T, double* X, int nsp, double* lewis, double* M){
         verbose: print debugging information
 
     Output:
-        s_ : specific entropy (J/K)
+        s0 : specific entropy at one Bar and temperature T (J/kg/K)
     */
     int s;
-    double Mmix, ns, s_, S0_Rs;
+    double Mmix, ns, s0, S0_Rs;
     double* lp;
 
     Mmix = 0.0; for (s=0; s<nsp; s++) Mmix+=X[s]*M[s];
     
-    s_ = 0.0;
+    s0 = 0.0;
     for (s=0; s<nsp; s++){
         ns = X[s]/Mmix;
         lp = lewis + 9*3*s;
         S0_Rs = compute_S0_R(T, lp);
-        s_ += ns*S0_Rs*Ru;
+        s0 += ns*S0_Rs*Ru;
     }
-    return s_;
+    return s0;
 }
 int batch_pt(int N, double* p,double* T,double* X0,int nsp,int nel,double* lewis,double* M,double* a,
              double* X1, int verbose){

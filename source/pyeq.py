@@ -109,7 +109,7 @@ def load_ceq_library():
     lib.get_u.restype = c_double
     lib.get_h.restype = c_double
     lib.get_cp.restype = c_double
-    lib.get_s.restype = c_double
+    lib.get_s0.restype = c_double
     lib.batch_pt.restype = c_int
     lib.batch_rhou.restype = c_int
     lib.batch_u.restype = c_int
@@ -167,7 +167,7 @@ def ps(lib, pt, st, Xs0, nsp, nel, lewis, M, a,verbose=0):
     ap    = a.ctypes.data_as(c_double_p)
     Xs1p  = Xs1.ctypes.data_as(c_double_p)
 
-    recode = lib.rhou(pp, sp, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p, Tref, verbose)
+    recode = lib.ps(pp, sp, Xs0p, nsp, nel, lewisp, Mp, ap, Xs1p, Tref, verbose)
     if recode!=0: raise Exception("Equilibrium Calc Failed.")
     T = Tp.value
     return Xs1, T
@@ -208,7 +208,7 @@ def get_cp(lib, T, X, nsp, lewis, M):
     cp = lib.get_cp(Td, Xp, nsp, lewisp, Mp)
     return cp
 
-def get_s(lib, T, X, nsp, lewis, M):
+def get_s0(lib, T, X, nsp, lewis, M):
     """ Call c library to compute internal entropy at fixed composition and temperature """
     Td = c_double(T)
 
@@ -217,7 +217,7 @@ def get_s(lib, T, X, nsp, lewis, M):
     Mp    = M.ctypes.data_as(c_double_p)
     lewisp= lewis.ctypes.data_as(c_double_p)
 
-    s = lib.get_s(Td, Xp, nsp, lewisp, Mp)
+    s = lib.get_s0(Td, Xp, nsp, lewisp, Mp)
     return s
 
 def batch_pt(lib, p, T, Xs0, nsp, nel, lewis, M, a,verbose=0):

@@ -3,7 +3,7 @@ Automated test code for ceq
 
 @author: Nick Gibbons
 """
-from numpy import array, zeros
+from numpy import array, zeros, log
 import pyeq
 
 def test_pt():
@@ -39,9 +39,6 @@ def test_rhou():
     nst = Xst/Mt # also cs/rhot 
     nt2 = nst.sum()
 
-    #species = [get_species(sp) for sp in spnames]
-    #U0st= [(sp.H0onRT(T) - 1.0)*Ru*T for sp in species]
-    #ut = sum(njt*U0jt for njt,U0jt in zip(nst,U0st))
     ut = pyeq.get_u(lib, T, Xst, nsp, lewisdata, M)
     ht = pyeq.get_h(lib, T, Xst, nsp, lewisdata, M)
 
@@ -76,10 +73,8 @@ def test_ps():
     nst = Xst/Mt # also cs/rhot 
     nt2 = nst.sum()
 
-    #species = [get_species(sp) for sp in spnames]
-    #U0st= [(sp.H0onRT(T) - 1.0)*Ru*T for sp in species]
-    #ut = sum(njt*U0jt for njt,U0jt in zip(nst,U0st))
-    st = pyeq.get_s(lib, T, Xst, nsp, lewisdata, M)
+    s0 = pyeq.get_s0(lib, T, Xst, nsp, lewisdata, M)
+    st = s0 - (Ru*nst*(log(nst/nt) + log(p/1e5))).sum()
     pt = p
 
     print("a",a.flatten())
