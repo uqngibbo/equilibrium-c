@@ -73,8 +73,8 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
         else {
             // Triggered if ns[s]==0. Note that in this situation mu_RTs and S_Rs are actually
             // equal to log(0.0) which is negative infinity. However, mu_RTs and S_Rs are always
-            // multiplied by zero later, and x*log(x) -> 0 as x->0, so we can set them to whatever
-            // to keep the floating point math happy
+            // multiplied by ns before being used, and x*log(x) -> 0 as x->0, so we can set them
+            // to whatever to keep the floating point math happy
             mu_RTs[s] = 0.0; 
             S_Rs[s]   = 0.0;
         }
@@ -142,11 +142,10 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
     nep = nel+1;
     for (i=0; i<nel; i++){
         aijnjSj = 0.0;
-
         for (j=0; j<nsp; j++){
-            aijnjSj = a[i*nsp+j]*ns[j]*S_Rs[j];
+            aijnjSj += a[i*nsp+j]*ns[j]*S_Rs[j];
         }
-        A[nep*nel + i+2] = aijnjSj; // pii entry, i+2 because dlnn, dlnT come first
+        A[nep*neq + i+2] = aijnjSj; // pii entry, i+2 because dlnn, dlnT come first
     }
 
     // Now the rest of 2.28
@@ -155,16 +154,13 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
     njHjSj = 0.0;
     njSjmuj = 0.0;
     for (j=0; j<nsp; j++){
-        //if (ns[j]==0.0) continue;
-        //mus_RTj = G0_RTs[j] + log(ns[j]) - lnn + lnp;
-
         njSj    += ns[j]*S_Rs[j];
         njCpj   += ns[j]*Cp_Rs[j];
         njHjSj  += ns[j]*H_RTs[j]*S_Rs[j];
         njSjmuj += ns[j]*S_Rs[j]*mu_RTs[j];
     }
-    A[nep*nel + 0] = njSj; // dlnn entry
-    A[nep*nel + 1] = njCpj + njHjSj; // dnlT entry
+    A[nep*neq + 0] = njSj; // dlnn entry
+    A[nep*neq + 1] = njCpj + njHjSj; // dnlT entry
     B[nep] = (st - sk)/Ru + n - nss + njSjmuj; // rhs
     
     //for (i=0; i<neq; i++){
@@ -313,11 +309,10 @@ static double temperature_guess(int nsp, double st, double pt, double n, double*
     */
     int s;
     double* lp;
-    double cp,s0,nls,Cps298,S0s298,nss,T;
+    double cp,s0,Cps298,S0s298,nss,T;
 
     cp = 0.0;
     s0 = 0.0;
-    nls= 0.0;
     for (s=0; s<nsp; s++){
         lp = lewis + 9*3*s;
         Cps298 = compute_Cp0_R(298.15, lp)*Ru;
@@ -326,12 +321,11 @@ static double temperature_guess(int nsp, double st, double pt, double n, double*
         nss = ns[s];
         cp += nss*Cps298;
         s0 += nss*S0s298;
-        nls+= nss*log(nss/n);
     }
 
-    T = 298.15*exp((st + s0 + Ru*(nls+ n*log(pt/1e5)))/cp); // See grey book 28/07/2019
+    // Guess with fixed cp at current composition
+    T = 298.15*exp((st - s0 + n*Ru*log(pt/1e5))/cp)/5.0; // See 06/08/2019
     printf("s0: %e\n", s0);
-    //T = 298.15*exp((st + Ru*(nls+ n*log(pt/1e5)))/cp); // See grey book 28/07/2019
     T = fmin(fmax(T, 200.0),20000.0); // Limit in case of bad initial state.
     return T;
 }
@@ -390,7 +384,7 @@ int solve_ps(double pt,double st,double* X0,int nsp,int nel,double* lewis,double
         errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, neq, dlnns);
 
         if (verbose>0){
-            printf("iter %2d: [%f]",k,n);
+            printf("iter %2d: [%f]",k,T);
             for (s=0; s<nsp; s++) printf(" %f",ns[s]);
             printf("  (%e)\n", errorrms);
         }
@@ -415,7 +409,7 @@ int solve_ps(double pt,double st,double* X0,int nsp,int nel,double* lewis,double
             break;
         }
 
-        if (k>=attempts) {
+        if (k>=attempts-1) {
             printf("Solver not converged, exiting!\n");
             errorcode=1;
             break;

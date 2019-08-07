@@ -82,7 +82,7 @@ def test_ps():
     print("nst",nst)
     print("pt",pt)
     print("Computing")
-    Xs1, Teq = pyeq.ps(lib, pt, st, Xs0, nsp, nel, lewisdata, M, a, 2)
+    Xs1, Teq = pyeq.ps(lib, pt, st, Xs0, nsp, nel, lewisdata, M, a, 1)
     print("Done X: ", Xs1)
     print("Target: ", Xst)
     print("Done T: ", Teq)

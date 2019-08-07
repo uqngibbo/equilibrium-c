@@ -65,7 +65,7 @@ def get_thermo_data(name):
         lewis.append(li)
 
     if len(lewis)!=3:
-        lewis.append(lewis[-1])
+        lewis.append(lewis[-1]) # FIXME: This is a problem you shouldn't do this.
     assert len(lewis)==3
 
     return atoms, M, lewis
