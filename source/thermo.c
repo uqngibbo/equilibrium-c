@@ -1,5 +1,16 @@
 /*
-C library for equilibrium chemistry calculations: thermo module
+C library for equilibrium chemistry calculations: Module for thermodynamic table evaluation
+
+References:
+    "NASA Glenn Coefficients for Calculating Thermodynamic Properties of Individual Species"
+    NASA/TP - 2002-211556, September 2002
+    Bonnie J. McBride, Michael J. Zehe, and Sanford Gordon
+
+Notes: This module contains routines for evaluating standard state thermodynamic variables
+       using the NASA Glenn thermodynamic database (thermo.inp), previously known as the 
+       NASA Lewis thermodynamic database. It assumes the 9 component curve fit coefficients
+       are arranged into an array called "lewis", ordered into three segements of nine,
+       one for each range 200-1000K, 1000-6000K, and 6000-20,000K.
 
 @author: Nick Gibbons
 */
@@ -13,10 +24,9 @@ const double Ru=8.3144621;      // Universal Gas Constant (J/mol/K)
 
 double compute_Cp0_R(double Tin, double* lewis){
     /*
-    Molar Specific Heat at constant Pressure at 1 BAR divided by Ru*T for a species using
-    the nasa lewis therodynamic data
-     Tin   : Temperature (double)
-     lewis : thermo data for current species (double)[3*9] 
+    Molar Specific Heat at constant Pressure at 1 BAR divided by Ru for a single species (unitless)
+        Tin   : Temperature (K)
+        lewis : thermo data for current species [3,9] 
     */
     double* lp;
     double Cp0_R,T;
@@ -38,9 +48,9 @@ double compute_Cp0_R(double Tin, double* lewis){
 
 double compute_H0_RT(double Tin, double* lewis){
     /*
-    Molar enthalpy at 1 BAR divided by Ru*T for a species using the nasa lewis therodynamic data
-     Tin   : Temperature (double)
-     lewis : thermo data for current species (double)[3*9] 
+    Molar enthalpy at 1 BAR divided by Ru*T for a single species (unitless)
+        Tin   : Temperature (K)
+        lewis : thermo data for current species [3,9] 
     */
     double* lp;
     double H0_RT,T;
@@ -62,9 +72,9 @@ double compute_H0_RT(double Tin, double* lewis){
 
 double compute_S0_R(double Tin, double* lewis){
     /*
-    Molar entropy at 1 BAR divided by Ru for a species using the nasa lewis therodynamic data
-     Tin   : Temperature (double)
-     lewis : thermo data for current species (double)[3*9] 
+    Molar entropy at 1 BAR divided by Ru for a single species (unitless)
+        Tin   : Temperature (K)
+        lewis : thermo data for current species [3,9] 
     */
     double* lp;
     double S0_R,T;
@@ -86,9 +96,9 @@ double compute_S0_R(double Tin, double* lewis){
 
 double compute_G0_RT(double T, double* lewis){
     /*
-    Compute the Molar entropy divided by Ru*T for a species using the nasa lewis therodynamic data
-     T     : Temperature (double)
-     lewis : thermo data for current species (double)[3*9] 
+    Compute the Molar Gibss free energy divided by Ru*T for a single  species (unitless)
+        Tin   : Temperature (K)
+        lewis : thermo data for current species [3,9] 
     */
     return compute_H0_RT(T, lewis) - compute_S0_R(T, lewis);
 }
