@@ -15,7 +15,7 @@ References:
 """
 
 from string import ascii_letters
-from numpy import array, zeros
+from numpy import array, zeros, log
 from ctypes import cdll,c_double,POINTER,c_int,byref
 
 letters = set(ascii_letters)
@@ -27,6 +27,7 @@ class EqCalculator(object):
     def __init__(self, spnames):
         self.spnames = spnames
         self.nsp = len(spnames)
+        self.lib = self.load_ceq_library()
 
         atoms = []
         M = []
@@ -58,12 +59,10 @@ class EqCalculator(object):
 
         self.a = a
 
-        self.lib = self.load_ceq_library()
         return
 
     def get_thermo_data(self, name):
         """ Stripped down version of get_species from lewis_thermo.py """
-        print("CALLED GET_THERMO_DATA", name)
         data = self.readdb(name)
         header = data[0].strip().split()
         if header[0]!=name:
@@ -91,13 +90,13 @@ class EqCalculator(object):
             li.extend([float(line2[16*j:16*(j+1)]) for j in range(3,5)])
             lewis.append(li)
 
-        if len(lewis)!=3: raise Exception("Missing thermodynamic data for species {}!".format(name))
-            #lewis.append(lewis[-1]) # FIXME: This is a problem you shouldn't do this.
-        #assert len(lewis)==3
+        if len(lewis)!=3:
+            lsp3 = self.fix_missing_thermo_segment(lewis, M)
+            lewis.append(lsp3)
+        assert len(lewis)==3 and len(lewis[0])==9 and len(lewis[1])==9 and len(lewis[2])==9
         return atoms, M, lewis
 
-    @staticmethod
-    def readdb(name):
+    def readdb(self,name):
         """ Retrieve species 'name' from the lewis_thermo.db file """
         with open(DBPATH) as fp:
 
@@ -119,6 +118,34 @@ class EqCalculator(object):
             else:
                 raise Exception("Name: {} not found!".format(name))
         return lines
+
+    def fix_missing_thermo_segment(self, lsp, Mi):
+        """ Create a NASA9 polynominal assuming constant Cp above 6000 K"""
+        assert len(lsp)==2
+        lspa = zeros((3,9))
+        lspa[0] = lsp[0] # This should copy data automatically
+        lspa[1] = lsp[1] # This should copy data automatically
+
+        T = 5999.99999
+        Ru = 8.3144621
+        X = array([1.0])
+        M = array([Mi])
+        Td = c_double(T)
+
+        c_double_p = POINTER(c_double)
+        Xp    = X.ctypes.data_as(c_double_p)
+        Mp    = M.ctypes.data_as(c_double_p)
+        lewisp= lspa.ctypes.data_as(c_double_p)
+        cp = self.lib.get_cp(Td, Xp, 1, lewisp, Mp)
+        h  = self.lib.get_h(Td, Xp, 1, lewisp, Mp)
+        s0 = self.lib.get_s0(Td, Xp, 1, lewisp, Mp)
+
+        a2 = cp*Mi/Ru
+        b1 = h*Mi/Ru - a2*T
+        b2 = s0*Mi/Ru - a2*log(T)
+        lsp2 = [0.0, 0.0, a2, 0.0, 0.0, 0.0, 0.0, b1, b2]
+        return lsp2
+
 
     @staticmethod
     def load_ceq_library(LIBPATH=LIBPATH):
