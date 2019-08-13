@@ -35,6 +35,20 @@
 
     The code is accessed through a python script that handles reading of data, memory management, and initialisation. All of this data is then passed to a set of c routines that do most of the actual work. See examples in the "tests" directory.
 
+```python
+from numpy import array
+import pyeq
+
+spnames = ['CO2', 'CO', 'O2']
+ceq = pyeq.EqCalculator(spnames)
+
+X0 = array([1.0, 0.0, 0.0])
+X1 = ceq.pt(p=0.1*101.35, T=2500.0, Xs0=X0)
+print(X1)
+
+>>> [ 0.09125492  0.60583005  0.30291503]
+```
+
 - Licensing
 
     This program is MIT licensed, which allows you do to almost anything with it except pretend that you wrote it or mess with the license itself. See the mit.txt file for details.
