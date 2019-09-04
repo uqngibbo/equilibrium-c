@@ -207,6 +207,42 @@ double get_s0(double T, double* X, int nsp, double* lewis, double* M){
     }
     return s0;
 }
+
+double get_s(double T, double p, double* X, int nsp, double* lewis, double* M){
+    /*
+    Compute specific entropy from known composition and primitives
+    Inputs:
+        T     : Temperature (K)
+        p     : Pressure (Pa)
+        X     : Composition Mole Fractions [nsp]
+        nsp   : number of species 
+        lewis : Nasa Lewis Thermodynamic Database Data [nsp*3*9]
+        M     : Molar Mass of each species (kg/mol) [nsp]
+        verbose: print debugging information
+
+    Output:
+        smix : specific entropy of mixture (J/kg/K)
+    */
+    int s;
+    double Mmix, ns, n, S0_Rs, S_Rs, lnn, lnp, smix;
+    double* lp;
+
+    Mmix = 0.0; for (s=0; s<nsp; s++) Mmix += X[s]*M[s];
+    n = 0.0;  for (s=0; s<nsp; s++) n += X[s]/Mmix;
+    lnn = log(n);
+    lnp = log(p/1e5);
+    
+    smix = 0.0;
+    for (s=0; s<nsp; s++){
+        ns = X[s]/Mmix;
+        lp = lewis + 9*3*s;
+        S0_Rs = compute_S0_R(T, lp);             // entropy @ one BAR divided by Ru
+        S_Rs = S0_Rs  - log(ns) + lnn - lnp;     // entropy at current pressure divided by Ru
+        smix += ns*S_Rs*Ru;
+    }
+    return smix;
+}
+
 int batch_pt(int N, double* p,double* T,double* X0,int nsp,int nel,double* lewis,double* M,double* a,
              double* X1, int verbose){
     /*

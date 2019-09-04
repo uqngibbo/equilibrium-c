@@ -158,6 +158,7 @@ class EqCalculator(object):
         lib.get_h.restype = c_double
         lib.get_cp.restype = c_double
         lib.get_s0.restype = c_double
+        lib.get_s.restype = c_double
         lib.batch_pt.restype = c_int
         lib.batch_rhou.restype = c_int
         lib.batch_u.restype = c_int
@@ -257,7 +258,7 @@ class EqCalculator(object):
         return cp
 
     def get_s0(self, T, X):
-        """ Call c library to compute internal entropy at fixed composition and temperature """
+        """ Call c library to compute specific entropy at standard state and arbitrary temperature """
         Td = c_double(T)
 
         c_double_p = POINTER(c_double)
@@ -265,8 +266,22 @@ class EqCalculator(object):
         Mp    = self.M.ctypes.data_as(c_double_p)
         lewisp= self.lewis.ctypes.data_as(c_double_p)
 
-        s = self.lib.get_s0(Td, Xp, self.nsp, lewisp, Mp)
+        s0 = self.lib.get_s0(Td, Xp, self.nsp, lewisp, Mp)
+        return s0
+
+    def get_s(self, T, p, X):
+        """ Call c library to compute internal entropy at an arbitrary pressure and temperature """
+        Td = c_double(T)
+        pd = c_double(p)
+
+        c_double_p = POINTER(c_double)
+        Xp    = X.ctypes.data_as(c_double_p)
+        Mp    = self.M.ctypes.data_as(c_double_p)
+        lewisp= self.lewis.ctypes.data_as(c_double_p)
+
+        s = self.lib.get_s(Td, pd, Xp, self.nsp, lewisp, Mp)
         return s
+
 
     def batch_pt(self, p, T, Xs0, verbose=0):
         """ Call c library to compute equilibrium concentrations at fixed p, T """
