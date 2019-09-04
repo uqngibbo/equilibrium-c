@@ -9,7 +9,7 @@ C library for equilibrium chemistry calculations
 #include <math.h>
 #include <stdlib.h>
 
-const double TRACELIMIT=1e-8;   // Trace species limiter (for ns/n)
+const double TRACELIMIT=1e-6;   // Trace species limiter (for ns/n)
 const double tol=1e-9;
 const int attempts=50;
 
@@ -85,7 +85,7 @@ void composition_guess(double* a,double* M,double* X0,int nsp,int nel,double* ns
     for (s=0; s<nsp; s++) n += ns[s];
     // This seemed to be a consistent cause of trouble. Maybe use fmax to prevent initial zeros?
     //for (s=0; s<nsp; s++) ns[s] = n/nsp;   
-    for (s=0; s<nsp; s++) ns[s] = fmax(ns[s], n*TRACELIMIT*2.0);
+    for (s=0; s<nsp; s++) ns[s] = fmax(ns[s], n*TRACELIMIT*100.0);
     *np = n;
 
     // Auto lock species with missing elements

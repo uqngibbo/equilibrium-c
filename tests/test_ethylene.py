@@ -12,7 +12,8 @@ def molef_from_massf(Y,Ms):
 
 def test_pt():
     spnames = 'N2,O2,C2H4,H2,CO,CO2,H2O'.split(',')
-    Ms = array([0.0280134, 0.0319988, 0.02805316, 0.00201588, 0.0280101, 0.0440095, 0.01801528])
+    ceq = pyeq.EqCalculator(spnames)
+    Ms = ceq.M
     ceaYs0 = array([0.75,  0.2, 0.05, 0.0, 0.0, 0.0, 0.0])
     ceaXst = {
         'CO': 1.2624e-2,
@@ -29,11 +30,9 @@ def test_pt():
 
     T = 2500.0
     p = 2.0*101.325e3
-    elements, nsp, nel, lewisdata, a, M = pyeq.startup(spnames)
-    lib = pyeq.load_ceq_library()
 
     print("Computing")
-    Xs1 = pyeq.pt(lib, p, T, Xs0, nsp, nel, lewisdata, M, a, 2)
+    Xs1 = ceq.pt(p, T, Xs0, 2)
     print("Done")
     print("Name  Init      Target    Computed")
     for s,k in enumerate(spnames):

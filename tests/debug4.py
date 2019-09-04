@@ -19,18 +19,12 @@ def test_pt():
     Xs0[5]=3.220202e-04
     Xs0[6]=4.257038e-14
 
-    #Xs0[0]=7.882249e-01
-    #Xs0[1]=2.114530e-01
-    #Xs0[2]=0.0
-    #Xs0[3]=0.0
-    #Xs0[4]=0.0
-    #Xs0[5]=3.220202e-04
-    #Xs0[6]=0.0
+    ceq = pyeq.EqCalculator(spnames)
 
-
-    elements, nsp, nel, lewisdata, a, M = pyeq.startup(spnames)
-
-    lib = pyeq.load_ceq_library()
+    a = ceq.a
+    M = ceq.M
+    nel = ceq.nel
+    nsp = ceq.nsp
 
     aij = a.reshape(nel,nsp).copy()
     Mmix = sum(Xs0*M)
@@ -38,12 +32,12 @@ def test_pt():
     ns0= Xs0/Mmix
     bi0 = (aij*ns0).sum(axis=1)
     print(spnames)
-    print(elements)
+    print(ceq.elements)
     print("a\n", aij)
     print("bi0", bi0)
 
     print("Computing")
-    Xs1 = pyeq.pt(lib, p, T, Xs0, nsp, nel, lewisdata, M, a, 1)
+    Xs1 = ceq.pt(p, T, Xs0, 2)
     print("Done")
     print("Name  Init       Computed   Diff")
     for s,k in enumerate(spnames):

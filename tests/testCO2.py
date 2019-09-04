@@ -8,7 +8,7 @@ from numpy import array, zeros, linspace
 from pylab import semilogy, legend, xlabel, ylabel, title, show, ylim
 from lewis_thermo import get_species
 from os import system 
-from pyeq import *
+import pyeq
 from re import search,split
 
 def get_cea_test(p,T,spnames):
@@ -54,12 +54,11 @@ if __name__=='__main__':
     spnames = ['CO2', 'CO', 'O2']
     Xs0 = array([1.0, 0.0, 0.0])
 
-    elements, nsp, nel, lewisdata, a, M = startup(spnames)
+    ceq = pyeq.EqCalculator(spnames)
     linecolours = ['red','blue','black']
     linestyles = ['-','--']
     markers = ['o','v']
     lines = []
-    lib = load_ceq_library()
 
     for i,p in enumerate(ps):
         print("p",p)
@@ -67,7 +66,7 @@ if __name__=='__main__':
         pi[:] = p
         Xs0i = zeros((Ts.size, Xs0.size))
         Xs0i[:,:] = Xs0
-        Xs1i = batch_pt(lib, pi, Ts, Xs0i, nsp, nel, lewisdata, M, a)
+        Xs1i = ceq.batch_pt(pi, Ts, Xs0i)
 
         icea = list(range(0,50,int(50/3)-1))
         Tcea = Ts[icea]
@@ -77,14 +76,14 @@ if __name__=='__main__':
 
         plines = []
         pmarks = []
-        for j in range(nsp):
+        for j in range(ceq.nsp):
             line = semilogy(Ts, Xs1i[:,j], linestyle=linestyles[i], color=linecolours[j])
             plines.extend(line)
             mark = semilogy(Tcea, Xcea[:,j], marker=markers[i],linestyle='None', color=linecolours[j])
             pmarks.extend(mark)
         lines.extend(plines+pmarks)
 
-    lnames = ['']*nsp*3 + spnames
+    lnames = ['']*ceq.nsp*3 + spnames
     ltitle = ' '+'           '.join(['{:8.2}'.format(p/101.35e3) for p in ps]) + '         (atm)\n'
     ltitle += ' ' + '    '.join(['ceq     CEA' for p in ps])
     xlabel('T (K)')
