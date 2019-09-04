@@ -46,11 +46,15 @@ if __name__=='__main__':
     ceadata = [i.strip().split('  ') for i in ceaoutput.splitlines()]
     ceadata = dict([(i[0], float(i[-1])) for i in ceadata if len(i)>2])
     ceaXs1 = array([ceadata['*CO2'], ceadata['*CO'], ceadata['*O2']])
+    ceqdata = {}
+    ceqdata['h'] = ceq.get_h(T, Xs1)
+    ceqdata['u'] = ceq.get_u(T, Xs1)
+    ceqdata['s'] = ceq.get_s(T, p, Xs1)
 
     print("          ceq    |   cea")
     print("XCO2:   {:8f} |   {:8f} ".format(Xs1[0], ceaXs1[0]))
     print("XCO:    {:8f} |   {:8f} ".format(Xs1[1], ceaXs1[1]))
     print("XO2:    {:8f} |   {:8f} ".format(Xs1[2], ceaXs1[2]))
-    print("h:    {:8f} | {:8f}  (kJ/kg)".format(ceq.get_h(T, Xs1)/1000.0, ceadata['H, KJ/KG']))
-    print("u:   {:8f} |{:8f}  (kJ/kg)".format(ceq.get_u(T, Xs1)/1000.0, ceadata['U, KJ/KG']))
-    print("s:      {:8f} |   {:8f}  (kJ/kg/K)".format(ceq.get_s(T, p, Xs1)/1000.0, ceadata['S, KJ/(KG)(K)']))
+    print("h:    {:8f} | {:8f}  (kJ/kg)".format(ceqdata['h']/1000.0, ceadata['H, KJ/KG']))
+    print("u:   {:8f} |{:8f}  (kJ/kg)".format(ceqdata['u']/1000.0, ceadata['U, KJ/KG']))
+    print("s:      {:8f} |   {:8f}  (kJ/kg/K)".format(ceqdata['s']/1000.0, ceadata['S, KJ/(KG)(K)']))
