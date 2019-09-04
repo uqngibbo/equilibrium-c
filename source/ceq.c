@@ -235,6 +235,8 @@ double get_s(double T, double p, double* X, int nsp, double* lewis, double* M){
     smix = 0.0;
     for (s=0; s<nsp; s++){
         ns = X[s]/Mmix;
+        if (ns==0.0) continue;
+
         lp = lewis + 9*3*s;
         S0_Rs = compute_S0_R(T, lp);             // entropy @ one BAR divided by Ru
         S_Rs = S0_Rs  - log(ns) + lnn - lnp;     // entropy at current pressure divided by Ru
