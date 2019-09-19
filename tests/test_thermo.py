@@ -5,11 +5,7 @@ Automated test code for ceq
 """
 
 from numpy import array, zeros, linspace
-from pylab import semilogy, legend, xlabel, ylabel, title, show, ylim
-from lewis_thermo import get_species
-from os import system 
 import pyeq
-from re import search,split
 
 if __name__=='__main__':
     p = 1.0*101.35e3
@@ -47,9 +43,9 @@ if __name__=='__main__':
     ceadata = dict([(i[0], float(i[-1])) for i in ceadata if len(i)>2])
     ceaXs1 = array([ceadata['*CO2'], ceadata['*CO'], ceadata['*O2']])
     ceqdata = {}
-    ceqdata['h'] = ceq.get_h(T, Xs1)
-    ceqdata['u'] = ceq.get_u(T, Xs1)
-    ceqdata['s'] = ceq.get_s(T, p, Xs1)
+    ceqdata['h'] = ceq.get_h(Xs1, T)
+    ceqdata['u'] = ceq.get_u(Xs1, T)
+    ceqdata['s'] = ceq.get_s(Xs1, T, p)
 
     print("          ceq    |   cea")
     print("XCO2:   {:8f} |   {:8f} ".format(Xs1[0], ceaXs1[0]))

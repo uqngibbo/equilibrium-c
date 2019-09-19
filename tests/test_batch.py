@@ -19,7 +19,7 @@ def test_u(ceq):
     Xs0 = array([[0.7, 0.2, 0.1],
                  [0.7, 0.2, 0.1]])
     print("Computing")
-    u = ceq.batch_u(T, Xs0)
+    u = ceq.batch_u(Xs0, T)
     print("Done: ", u)
     return
 

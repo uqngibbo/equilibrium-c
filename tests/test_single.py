@@ -24,8 +24,8 @@ def test_rhou(ceq, T, p, Xs0, Xst):
     nst = Xst/Mt # also cs/rhot 
     nt2 = nst.sum()
 
-    ut = ceq.get_u(T, Xst)
-    ht = ceq.get_h(T, Xst)
+    ut = ceq.get_u(Xst, T)
+    ht = ceq.get_h(Xst, T)
 
     print("ut",ut)
     print("ht",ht)
@@ -48,7 +48,7 @@ def test_ps(ceq, T, p, Xs0, Xst):
     nst = Xst/Mt # also cs/rhot 
     nt2 = nst.sum()
 
-    s0 = ceq.get_s0(T, Xst)
+    s0 = ceq.get_s0(Xst, T)
     st = s0 - (Ru*nst*(log(nst/nt) + log(p/1e5))).sum()
     pt = p
 

@@ -221,7 +221,7 @@ class EqCalculator(object):
         T = Tp.value
         return Xs1, T
 
-    def get_u(self, T, X):
+    def get_u(self, X, T):
         """ Call c library to compute internal energy at fixed composition and temperature """
         Td = c_double(T)
 
@@ -233,7 +233,7 @@ class EqCalculator(object):
         u = self.lib.get_u(Td, Xp, self.nsp, lewisp, Mp)
         return u
 
-    def get_h(self, T, X):
+    def get_h(self, X, T):
         """ Call c library to compute internal energy at fixed composition and temperature """
         Td = c_double(T)
 
@@ -245,7 +245,7 @@ class EqCalculator(object):
         h = self.lib.get_h(Td, Xp, self.nsp, lewisp, Mp)
         return h
 
-    def get_cp(self, T, X):
+    def get_cp(self, X, T):
         """ Call c library to compute internal energy at fixed composition and temperature """
         Td = c_double(T)
 
@@ -257,7 +257,7 @@ class EqCalculator(object):
         cp = self.lib.get_cp(Td, Xp, self.nsp, lewisp, Mp)
         return cp
 
-    def get_s0(self, T, X):
+    def get_s0(self, X, T):
         """ Call c library to compute specific entropy at standard state and arbitrary temperature """
         Td = c_double(T)
 
@@ -269,7 +269,7 @@ class EqCalculator(object):
         s0 = self.lib.get_s0(Td, Xp, self.nsp, lewisp, Mp)
         return s0
 
-    def get_s(self, T, p, X):
+    def get_s(self, X, T, p):
         """ Call c library to compute internal entropy at an arbitrary pressure and temperature """
         Td = c_double(T)
         pd = c_double(p)
@@ -331,7 +331,7 @@ class EqCalculator(object):
         if recode!=0: raise Exception("Equilibrium Calc Failed.")
         return Xs1, T
 
-    def batch_u(self, T, X):
+    def batch_u(self, X, T):
         """ Call c library to compute internal energy at fixed composition and temperature """
         N, nspcheck = X.shape
         if not X.flags['OWNDATA']: raise Exception("X Memory Error: Array must own its data")

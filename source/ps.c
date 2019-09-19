@@ -325,7 +325,7 @@ static double temperature_guess(int nsp, double st, double pt, double n, double*
 
     // Guess with fixed cp at current composition
     T = 298.15*exp((st - s0 + n*Ru*log(pt/1e5))/cp)/5.0; // See 06/08/2019
-    printf("s0: %e\n", s0);
+    //printf("s0: %e\n", s0);
     T = fmin(fmax(T, 200.0),20000.0); // Limit in case of bad initial state.
     return T;
 }
