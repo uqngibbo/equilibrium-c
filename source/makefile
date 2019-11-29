@@ -1,6 +1,6 @@
 CC ?= gcc
 CFLAGS := -I. -fPIC
-INSTALL_DIR=/home/qungibbo/programs/ceq
+INSTALL_DIR ?= $(HOME)/ceq
 
 thermo.o: thermo.c thermo.h
 	$(CC) $(CFLAGS) -c thermo.c
@@ -27,11 +27,11 @@ ceq: thermo.o linalg.o common.o pt.o rhou.o ps.o ceq.o
 	$(CC) $(CFLAGS) -shared thermo.o linalg.o common.o pt.o rhou.o ps.o ceq.o -lm -o libceq.so
 
 install: 
+	mkdir -p $(INSTALL_DIR)
 	cp libceq.so $(INSTALL_DIR)
-	sed "s+DBPATH='../thermo.inp'+DBPATH='$(INSTALL_DIR)/thermo.inp'+" pyeq.py > pyeq1.py
-	sed "s+LIBPATH='./libceq.so'+LIBPATH='$(INSTALL_DIR)/libceq.so'+" pyeq1.py > pyeq2.py
-	cp pyeq2.py $(INSTALL_DIR)/pyeq.py
-	rm -rf pyeq1.py pyeq2.py
+	sed -e "s+DBPATH='../thermo.inp'+DBPATH='$(INSTALL_DIR)/thermo.inp'+" \
+        -e "s+LIBPATH='./libceq.so'+LIBPATH='$(INSTALL_DIR)/libceq.so'+" \
+        pyeq.py > $(INSTALL_DIR)/pyeq.py
 	cp '../thermo.inp' $(INSTALL_DIR)
 	rm -rf $(INSTALL_DIR)/tests
 	cp -r ../tests $(INSTALL_DIR)
