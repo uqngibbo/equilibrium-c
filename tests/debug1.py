@@ -37,8 +37,8 @@ def test_pt():
     print("bi0", bi0)
 
     print("Computing")
-    Xs1 = ceq.pt(p, T, Xs0, 2)
-    print("Done")
+    Xs1 = ceq.pt(p, T, Xs0, 1)
+    print("Done (Fixed conditions @ p={:1.6f} T={:1.6f})".format(p,T))
     print("Name  Init       Computed   Diff")
     for s,k in enumerate(spnames):
         print('{:>4}: {:1.6f}   {:1.6f}   {:1.6e}'.format(k, Xs0[s], Xs1[s], abs(Xs1[s]-Xs0[s])))

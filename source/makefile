@@ -2,6 +2,9 @@ CC ?= gcc
 CFLAGS := -I. -fPIC
 INSTALL_DIR ?= $(HOME)/ceq
 
+all: thermo.o linalg.o common.o pt.o rhou.o ps.o ceq.o
+	$(CC) $(CFLAGS) -shared thermo.o linalg.o common.o pt.o rhou.o ps.o ceq.o -lm -o libceq.so
+
 thermo.o: thermo.c thermo.h
 	$(CC) $(CFLAGS) -c thermo.c
 
@@ -22,9 +25,6 @@ ps.o: ps.c thermo.h linalg.h common.h ps.h
 
 ceq.o: ceq.c thermo.h pt.h rhou.h ps.h ceq.h
 	$(CC) $(CFLAGS) -c ceq.c
-
-ceq: thermo.o linalg.o common.o pt.o rhou.o ps.o ceq.o
-	$(CC) $(CFLAGS) -shared thermo.o linalg.o common.o pt.o rhou.o ps.o ceq.o -lm -o libceq.so
 
 install: 
 	mkdir -p $(INSTALL_DIR)

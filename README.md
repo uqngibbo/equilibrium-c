@@ -39,14 +39,14 @@
 from numpy import array
 import pyeq
 
-spnames = ['CO2', 'CO', 'O2']
-ceq = pyeq.EqCalculator(spnames)
+species = ['CO2', 'CO', 'O2']
+ceq = pyeq.EqCalculator(species)
 
 X0 = array([1.0, 0.0, 0.0])
-X1 = ceq.pt(p=0.1*101.35, T=2500.0, Xs0=X0)
+X1 = ceq.pt(p=10e3, T=2500.0, Xs0=X0)
 print(X1)
 
->>> [ 0.09125492  0.60583005  0.30291503]
+>>> array([ 0.65897178,  0.22735215,  0.11367607])
 ```
 
 - Licensing
