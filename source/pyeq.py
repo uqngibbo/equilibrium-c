@@ -166,6 +166,7 @@ class EqCalculator(object):
 
     def pt(self, p, T, Xs0, verbose=0):
         """ Call c library to compute equilibrium concentrations at fixed p, T """
+        if Xs0.size!=self.nsp: raise Exception('Mismatched array size {}!={}'.format(Xs0.size, self.nsp))
         Xs1 = zeros(Xs0.shape)
         pp = c_double(p)
         Tp = c_double(T)
@@ -183,6 +184,7 @@ class EqCalculator(object):
 
     def rhou(self, rho, u, Xs0, verbose=0):
         """ Call c library to compute equilibrium concentrations at fixed rho, u """
+        if Xs0.size!=self.nsp: raise Exception('Mismatched array size {}!={}'.format(Xs0.size, self.nsp))
         Xs1 = zeros(Xs0.shape)
         rhop = c_double(rho)
         up = c_double(u)
@@ -203,6 +205,7 @@ class EqCalculator(object):
 
     def ps(self, pt, st, Xs0, verbose=0):
         """ Call c library to compute equilibrium concentrations at fixed p, s """
+        if Xs0.size!=self.nsp: raise Exception('Mismatched array size {}!={}'.format(Xs0.size, self.nsp))
         Xs1 = zeros(Xs0.shape)
         pp = c_double(pt)
         sp = c_double(st)
