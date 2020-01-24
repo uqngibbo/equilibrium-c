@@ -354,5 +354,15 @@ class EqCalculator(object):
         if recode!=0: raise Exception("u calc failed.")
         return u
 
+    def YtoX(self, Y):
+        Mmix = 1.0/((Y/self.M).sum())
+        X = Y*Mmix/self.M
+        return X
+    
+    def XtoY(self, X):
+        Mmix = (X*self.M).sum()
+        Y = X*self.M/Mmix
+        return Y
+
 if __name__=='__main__':
     print("Called pyeq main!")

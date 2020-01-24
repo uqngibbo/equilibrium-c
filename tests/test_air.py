@@ -11,8 +11,10 @@ Ru = 8.3144598 # uses gram-moles, or regular moles... to match M in lewis_librar
 def test_pt(ceq, T, p, Xs0, Xst):
     print("Computing")
     Xs1 = ceq.pt(p, T, Xs0, 1)
-    print("Done:   ", Xs1)
-    print("Target: ", Xst)
+    Ys1 = ceq.XtoY(Xs1)
+    Yst = ceq.XtoY(Xst)
+    print("Done:   ", Ys1)
+    print("Target: ", Yst)
     return
 
 def test_rhou(ceq, T, p, Xs0, Xst):
@@ -66,11 +68,9 @@ if __name__=='__main__':
     spnames = ['N2', 'O2', 'N', 'O', 'NO']
     T = 2500.0
     p = 0.1*101.35e3
-    Xs0 = array([0.7, 0.3, 0.0, 0.0, 0.0])
-    Xst = array([0.67952946, 0.27240684, 0.0, 0.0237421, 0.0243216] )
+    Xs0 = array([0.76, 0.23, 0.0, 0.0, 0.0])
+    Xst = array([0.74854377, 0.20836613, 0.0, 0.0207646, 0.0223255] )
     ceq = pyeq.EqCalculator(spnames)
-    print(ceq.a)
-    print(ceq.a.flatten())
 
     test_pt(ceq, T, p, Xs0, Xst)
     #print(' ')
