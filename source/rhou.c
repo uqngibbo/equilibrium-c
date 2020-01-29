@@ -277,8 +277,8 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
         Teq: Equilibrium Temperature 
     */
     double *A, *B, *S, *G0_RTs, *U0_RTs, *Cv0_Rs, *ns, *bi0, *dlnns; // Dynamic arrays
-    int neq,s,i,k,errorcode,ntrace;
-    double M0,n,M1,errorL2,errorL22,thing,T,errorrms;
+    int neq,s,i,k,errorcode;
+    double n,M1,T,errorrms;
 
     errorcode=0;
     neq= nel+1;

@@ -18,7 +18,7 @@ int solve_matrix(double* A, double* B, double *X, int N){
        N : problem size (int)
     */
     int i,j,k,p;
-    double pval,a,b;
+    double pval,a;
     k=0; // working diagonal for row reduction
 
     while (k<N) {

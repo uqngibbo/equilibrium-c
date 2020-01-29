@@ -49,9 +49,9 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
         Fast index varies over variables: dlnn, dlnT, pi1, pi2, ..., pi_nel
         Slow index varies over equations 2.24_1, 2.24_2, ..., 2.24_nel, 2.25, 2.28
     */
-    double lnns, lnn, lnp, akjaijnj, akjnjmuj, mus_RTj, bk;
+    double lnn, lnp, akjaijnj, akjnjmuj, bk;
     double akjnjHj, nsHs, aijnjSj, njSj, njCpj, njHjSj, njSjmuj;
-    double nss, nsmus, coeffsum, sk, G0_RTs, S0_Rs;
+    double nss, nsmus, sk, G0_RTs, S0_Rs;
     int k,neq,i,j,s,nep;
     double *lp;
     neq = nel+2;
@@ -110,8 +110,6 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
 
         akjnjmuj = 0.0;
         for (j=0; j<nsp; j++){
-            //if (ns[s]==0.0) continue;
-            //mus_RTj = G0_RTs[j] + log(ns[j]) - lnn + lnp;
             akjnjmuj += a[k*nsp+j]*ns[j]*mu_RTs[j];
         }
         B[k] = bi0[k] - bk + akjnjmuj; // rhs
@@ -128,8 +126,6 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
     nsmus = 0.0;
     nsHs = 0.0;
     for (s=0; s<nsp; s++){
-        //if (ns[s]==0.0) continue;
-        //mus_RTj = G0_RTs[s] + log(ns[s]) - lnn + lnp;
         nss += ns[s];
         nsmus += ns[s]*mu_RTs[s];
         nsHs += ns[s]*H_RTs[s];
@@ -193,16 +189,13 @@ static void species_corrections(double* S,double* a,double* mu_RTs,double* H_RTs
     Outputs:
         dllns : change in log(ns) [nsp]
     */
-    double dlnn,aispii,lnn,lnp,dlnT;
+    double dlnn,aispii,dlnT;
     int s,i;
     dlnn = S[0];
     dlnT = S[1];
-    lnn = log(n);
-    lnp = log(p/1e5);
 
     for (s=0; s<nsp; s++) {
         if (ns[s]==0.0) { dlnns[s] = 0.0; continue;}
-        //mu_RTs = G0_RTs[s] + log(ns[s]) - lnn + lnp;
 
         aispii = 0.0;
         for (i=0; i<nel; i++){
@@ -260,8 +253,8 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
         n  : pointer to total moles/mixture (passed by reference!) [1]
         T  : pointer to current Temperature (passed by reference!) [1]
     */
-    int s,i;
-    double lnns,lnn,n_copy,lambda,newns,rdlnns,bi,lnT,T_copy;
+    int s;
+    double lnns,lnn,n_copy,lambda,newns,rdlnns,lnT,T_copy;
     const char pstring[] = "  s: %d lnns: % f rdlnns: % f dlnns: %f TR: % e lambda: % f\n"; 
 
     lnn = log(*n); // compute the log of the thing n is pointing to
@@ -350,8 +343,8 @@ int solve_ps(double pt,double st,double* X0,int nsp,int nel,double* lewis,double
         Teq: Equilibrium Temperature 
     */
     double *A, *B, *S, *mu_RTs, *H_RTs, *S_Rs, *Cp_Rs, *ns, *bi0, *dlnns; // Dynamic arrays
-    int neq,s,i,k,errorcode,ntrace;
-    double M0,n,M1,errorL2,errorL22,thing,T,errorrms;
+    int neq,s,i,k,errorcode;
+    double n,M1,T,errorrms;
 
     errorcode=0;
     neq= nel+2;
