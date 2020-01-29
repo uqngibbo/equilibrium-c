@@ -1,4 +1,4 @@
-CC ?= gcc
+CC = gcc
 CFLAGS := -I. -fPIC -Wall -std=c99
 INSTALL_DIR ?= $(HOME)/ceq
 
