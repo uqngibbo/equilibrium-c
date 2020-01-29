@@ -66,7 +66,7 @@ int solve_matrix(double* A, double* B, double *X, int N){
     //    for (j=0; j<N; j++){
     //        printf("%f ", A[i*N+j]);
     //    }
-    //    printf("]\n");
+    //    printf("]  [ %f ]\n", B[i]);
     //}
     //printf("\n");
     } // end while loop for row reduction

@@ -43,6 +43,13 @@ static void Assemble_Matrices(double* a,double* bi0, double rho0,double u0,doubl
 
     // Equation 2.45: k-> equation index, i-> variable index
     for (k=0; k<nel; k++){
+        if (bi0[k]<1e-16) { // Check for missing missing element equations and Lock
+            for (i=0; i<neq; i++) A[k*neq+i] = 0.0;
+            A[k*neq + k+1] = 1.0;   
+            B[k] = 0.0;
+            continue;
+        }
+
         bk = 0.0; for (s=0; s<nsp; s++) bk += a[k*nsp + s]*ns[s];
 
         for (i=0; i<nel; i++){
@@ -55,6 +62,7 @@ static void Assemble_Matrices(double* a,double* bi0, double rho0,double u0,doubl
         akjnjmuj = 0.0;
         akjnjUj = 0.0;
         for (j=0; j<nsp; j++){
+            if (ns[j]==0.0) continue;
             mus_RTj = G0_RTs[j] + log(rho0*ns[j]*Ru*T/1e5);
             akjnjmuj += a[k*nsp+j]*ns[j]*mus_RTj;
             akjnjUj  += a[k*nsp+j]*ns[j]*U0_RTs[j];
@@ -69,6 +77,7 @@ static void Assemble_Matrices(double* a,double* bi0, double rho0,double u0,doubl
     njUjmuj= 0.0;
 
     for (j=0; j<nsp; j++){
+        if (ns[j]==0.0) continue;
         mus_RTj = G0_RTs[j] + log(rho0*ns[j]*Ru*T/1e5);
         njCvj += ns[j]*Cv0_Rs[j];
         njUj2 += ns[j]*U0_RTs[j]*U0_RTs[j];
@@ -86,6 +95,7 @@ static void Assemble_Matrices(double* a,double* bi0, double rho0,double u0,doubl
     }
 
     //for (i=0; i<neq; i++){
+    //    printf("   |");
     //    for (j=0; j<neq; j++){
     //        printf("%f ", A[i*neq+j]);
     //    }
@@ -125,6 +135,7 @@ static void species_corrections(double* S,double* a,double* G0_RTs,double* U0_RT
     //}
     
     for (s=0; s<nsp; s++) {
+        if (ns[s]==0.0) { dlnns[s] = 0.0; continue;}
         mus_RTs = G0_RTs[s] + log(rho0*ns[s]*Ru*T/1e5);
 
         aispii = 0.0;
@@ -200,6 +211,7 @@ static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* T
         lnns = log(ns[s]);
         lambda = fmin(1.0, fabs(lnn)/fabs(dlnns[s]));
         ns[s] = exp(lnns + lambda*dlnns[s]);
+        if (verbose>1) printf(pstring, s, lnns, lambda*dlnns[s], dlnns[s], 0.0, lambda);
     }
     n = 0.0; for (s=0; s<nsp; s++) n+=ns[s];
     *np = n;

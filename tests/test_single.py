@@ -49,7 +49,7 @@ def test_ps(ceq, T, p, Xs0, Xst):
     nt2 = nst.sum()
 
     s0 = ceq.get_s0(Xst, T)
-    st = s0 - (Ru*nst*(log(nst/nt) + log(p/1e5))).sum()
+    st = ceq.get_s(Xst, T, p)
     pt = p
 
     print("st",st)
