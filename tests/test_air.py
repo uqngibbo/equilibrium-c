@@ -34,7 +34,7 @@ def test_rhou(ceq, T, p, Xs0, Xst):
     print("ht",ht)
     print("nst",nst)
     print("rhot",rhot)
-    print("Computing")
+    print("Computing rhou....")
     Xs1, Teq = ceq.rhou(rhot, ut, Xs0, 1)
     print("Done X: ", Xs1)
     print("Target: ", Xst)
