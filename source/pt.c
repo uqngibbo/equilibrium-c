@@ -176,18 +176,18 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
     const char pstring[] = "  s: %d lnns: % f rdlnns: % f dlnns: %f TR: % e lambda: % f\n"; 
 
     lnn = log(*n); // compute the log of the thing n is pointing to
-    lambda = fmin(1.0, 0.5*fabs(lnn)/fabs(S[0]));
+    lambda = update_limit_factor(lnn, S[0], 0.5);
     n_copy = exp(lnn + lambda*S[0]); 
     *n = n_copy;   // thing pointed to by n set to exp(lnn + S[0]);
 
     for (s=0; s<nsp; s++){
         if (ns[s]==0.0) {
-            if (verbose>1) printf(pstring, s, -1.0/0.0, 0.0, dlnns[s], 0.0, 0.0);
+            if (verbose>1) printf(pstring, s, 0.0, 0.0, dlnns[s], 0.0, 0.0);
             dlnns[s] = 0.0;
             continue;
         }
         lnns = log(ns[s]);
-        lambda = fmin(1.0, 0.5*fabs(lnn)/fabs(dlnns[s]));
+        lambda = update_limit_factor(lnn, dlnns[s], 0.5);
         newns = exp(lnns + lambda*dlnns[s]);
         rdlnns = log(newns) - lnns;
         ns[s] = newns;

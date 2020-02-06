@@ -14,8 +14,8 @@ def test_pt(ceq, T, p, Xs0, Xst):
     Ys0 = ceq.XtoY(Xs0)
     Ys1 = ceq.XtoY(Xs1)
     Yst = ceq.XtoY(Xst)
-    print("Done:   ", Ys1)
-    print("Target: ", Yst)
+    print("Done Y:   ", Ys1)
+    print("Target Y: ", Yst)
     return
 
 def test_rhou(ceq, T, p, Xs0, Xst):
@@ -36,8 +36,11 @@ def test_rhou(ceq, T, p, Xs0, Xst):
     print("rhot",rhot)
     print("Computing rhou....")
     Xs1, Teq = ceq.rhou(rhot, ut, Xs0, 1)
-    print("Done X: ", Xs1)
-    print("Target: ", Xst)
+    Ys0 = ceq.XtoY(Xs0)
+    Ys1 = ceq.XtoY(Xs1)
+    Yst = ceq.XtoY(Xst)
+    print("Done Y:   ", Ys1)
+    print("Target Y: ", Yst)
     print("Done T: ", Teq)
     print("Target: ", T)
     return
@@ -59,8 +62,11 @@ def test_ps(ceq, T, p, Xs0, Xst):
     print("pt",pt)
     print("Computing")
     Xs1, Teq = ceq.ps(pt, st, Xs0, 1)
-    print("Done X: ", Xs1)
-    print("Target: ", Xst)
+    Ys0 = ceq.XtoY(Xs0)
+    Ys1 = ceq.XtoY(Xs1)
+    Yst = ceq.XtoY(Xst)
+    print("Done Y:   ", Ys1)
+    print("Target Y: ", Yst)
     print("Done T: ", Teq)
     print("Target: ", T)
 

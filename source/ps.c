@@ -258,12 +258,12 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
     const char pstring[] = "  s: %d lnns: % f rdlnns: % f dlnns: %f TR: % e lambda: % f\n"; 
 
     lnn = log(*n); // compute the log of the thing n is pointing to
-    lambda = fmin(1.0, 0.5*fabs(lnn)/fabs(S[0]));
+    lambda = update_limit_factor(lnn, S[0], 0.5);
     n_copy = exp(lnn + lambda*S[0]); 
     *n = n_copy;   // thing n in pointing to set to n_copy
 
     lnT = log(*T); // compute the log of the thing T is pointing to
-    lambda = fmin(1.0, 0.5*fabs(lnT)/fabs(S[1]));
+    lambda = update_limit_factor(lnT, S[1], 0.5);
     T_copy = exp(lnT + lambda*S[1]); 
     *T = T_copy;   // thing T is pointing to set to T_copy;
 
@@ -274,7 +274,7 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
             continue;
         }
         lnns = log(ns[s]);
-        lambda = fmin(1.0, 0.5*fabs(lnn)/fabs(dlnns[s]));
+        lambda = update_limit_factor(lnn, dlnns[s], 0.5);
         newns = exp(lnns + lambda*dlnns[s]);
         rdlnns = log(newns) - lnns;
         ns[s] = newns;
