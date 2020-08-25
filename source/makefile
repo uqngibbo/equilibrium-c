@@ -36,7 +36,7 @@ install:
 	cp 'clib.py' $(INSTALL_DIR)
 	cp '../thermo.inp' $(INSTALL_DIR)
 	cp 'ceq.h' $(INSTALL_DIR)
-	cp -r ../tests/* $(INSTALL_DIR)/tests/
+	cp -r ../tests $(INSTALL_DIR)/
 
 moduletests: thermo.c thermo.h thermo.o linalg.c linalg.h linalg.o
 	$(CC) thermo.c -D TEST -lm -o ../tests/testthermo

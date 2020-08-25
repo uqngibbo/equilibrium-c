@@ -29,7 +29,6 @@ class CLib(CDLL):
                 cfunctions.append(cfunction(m[1], m[0], argtypes, argnames))
 
         for function in cfunctions:
-            print(function)
             getattr(self,function.name).restype = ctypesmap[function.restype]
             getattr(self,function.name).argtypes = [ctypesmap[i] for i in function.argtypes]
 
