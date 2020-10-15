@@ -9,7 +9,7 @@ from numpy import array, zeros, absolute, linspace
 import pyeq
 
 class TestCEQ(unittest.TestCase):
-    def test_thermo(self, verbose=True):
+    def test_thermo(self, verbose=False):
         p = 1.0132*1e5
         T = 3698.04
         spnames = ['CO2', 'CO', 'O2']

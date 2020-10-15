@@ -33,8 +33,6 @@ class TestCEQ(unittest.TestCase):
         n0 = sum(Xs0/Mmix)
         ns0= Xs0/Mmix
         bi0 = (aij*ns0).sum(axis=1)
-        print(spnames)
-        print(ceq.elements)
 
         Xs1 = ceq.pt(p, T, Xs0, 0)
 
