@@ -26,7 +26,7 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
     /*
     Construct Iteration Matrix for reduced Newton Rhapson step, (eqn 2.24 and 2.26 from cea_I)
     */
-    double lnn, lnp, akjaijnj, akjnjmuj, mus_RTj, bk, row_is_bad;
+    double lnn, lnp, akjaijnj, akjnjmuj, mus_RTj, bk;
     double nss, nsmus;
     int k,neq,i,j,s;
     neq = nel+1;
@@ -38,14 +38,12 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
         bk = 0.0; for (s=0; s<nsp; s++) bk += a[k*nsp + s]*ns[s];
         A[k*neq + 0] = bk;
 
-        row_is_bad = 0.0;
         for (i=0; i<nel; i++){
             akjaijnj = 0.0;
             for (j=0; j<nsp; j++){
                 akjaijnj += a[k*nsp+j]*a[i*nsp+j]*ns[j];
             }
             A[k*neq + i+1] = akjaijnj;
-            row_is_bad += akjaijnj;
         }
 
         akjnjmuj = 0.0;
@@ -56,14 +54,7 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
 
         }
         B[k] = bi0[k] - bk + akjnjmuj;
-
-        // If a singular row entry is detected, set that row to a trivial equation.
-        if (row_is_bad<1e-16) {
-            for (i=0; i<neq; i++) A[k*neq+i] = 0.0;
-            A[k*neq + k+1] = 1.0;   
-            B[k] = 0.0;
-            continue;
-        }
+        check_ill_posed_matrix_row(A, B, neq, k);
     }
 
     // Equation 2.26 - > (only the pii entries, we're highjacking k here to go across the last row)

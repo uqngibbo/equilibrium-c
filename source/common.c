@@ -18,7 +18,7 @@ double update_limit_factor(double x, double dx, double fac){
     Compute lambda for variable updates, checking for dx==0.0 hardware exception
     Inputs:
         x      : reference quantity
-        dx     : proposed raw change in quantity 
+        dx     : proposed raw change in quantity
         fac    : limit parameter  
     Outputs:
         lambda : update limit factor, generally x' = x + lambda*dx
@@ -180,4 +180,29 @@ double constraint_errors(double* S,double* a,double* bi0,double* ns,int nsp,int 
     errorrms /= n; // Implicit typecast, is this a good idea?
     errorrms = sqrt(errorrms);
     return errorrms;
+}
+
+void check_ill_posed_matrix_row(double* A, double* B, int neq, int k){
+    /*
+    Check for singular rows within the solve matrix. These may arise if all of the species containing
+    one element have been zeroed out of the calculation, for example.
+    Inputs:
+        A      : Linear Solve Matrix [neq,neq]
+        B      : Linear Solve RHS [neq]
+        neq    : number of equations in the matrix
+        k      : the row in question
+    */
+    double row_is_bad;
+    int i;
+
+    row_is_bad = 0.0;
+    for (i=0; i<neq; i++) row_is_bad += A[k*neq+i];
+
+    // If a singular row entry is detected, set that row to a trivial equation.
+    // This equation is designed to force pi_k to be zero.
+    if (row_is_bad<1e-16) {
+        for (i=0; i<neq; i++) A[k*neq+i] = 0.0;
+        A[k*neq + k+1] = 1.0;
+        B[k] = 0.0;
+    }
 }
