@@ -43,13 +43,6 @@ static void Assemble_Matrices(double* a,double* bi0, double rho0,double u0,doubl
 
     // Equation 2.45: k-> equation index, i-> variable index
     for (k=0; k<nel; k++){
-        if (bi0[k]<1e-16) { // Check for missing missing element equations and Lock
-            for (i=0; i<neq; i++) A[k*neq+i] = 0.0;
-            A[k*neq + k+1] = 1.0;   
-            B[k] = 0.0;
-            continue;
-        }
-
         bk = 0.0; for (s=0; s<nsp; s++) bk += a[k*nsp + s]*ns[s];
 
         for (i=0; i<nel; i++){
@@ -69,7 +62,7 @@ static void Assemble_Matrices(double* a,double* bi0, double rho0,double u0,doubl
         }
         A[k*neq + 0] = akjnjUj; // Temperature matrix entry
         B[k] = bi0[k] - bk + akjnjmuj; // RHS of kth equation 2.45
-
+        check_ill_posed_matrix_row(A, B, neq, k, 1);
     }
     // Equation 2.47
     njCvj  = 0.0;
@@ -97,10 +90,11 @@ static void Assemble_Matrices(double* a,double* bi0, double rho0,double u0,doubl
     //for (i=0; i<neq; i++){
     //    printf("   |");
     //    for (j=0; j<neq; j++){
-    //        printf("%f ", A[i*neq+j]);
+    //        printf("%+08.6f ", A[i*neq+j]);
     //    }
-    //    printf("| %f\n", B[i]);
+    //    printf("| %+08.6f\n", B[i]);
     //}
+    //printf("______________________________________________________\n");
     return;
 }
 

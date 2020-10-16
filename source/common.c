@@ -182,7 +182,7 @@ double constraint_errors(double* S,double* a,double* bi0,double* ns,int nsp,int 
     return errorrms;
 }
 
-void check_ill_posed_matrix_row(double* A, double* B, int neq, int k){
+void check_ill_posed_matrix_row(double* A, double* B, int neq, int k, int offset){
     /*
     Check for singular rows within the solve matrix. These may arise if all of the species containing
     one element have been zeroed out of the calculation, for example.
@@ -191,18 +191,22 @@ void check_ill_posed_matrix_row(double* A, double* B, int neq, int k){
         B      : Linear Solve RHS [neq]
         neq    : number of equations in the matrix
         k      : the row in question
+        offset : how many entries before the pi_i's.
+
+        Notes:
+         - For example, in the pt problem the unknowns are [dln n, pi_1, pi_2, ...], so offset=1
     */
     double row_is_bad;
     int i;
 
     row_is_bad = 0.0;
-    for (i=0; i<neq; i++) row_is_bad += A[k*neq+i];
+    for (i=0; i<neq; i++) row_is_bad += fabs(A[k*neq+i]);
 
     // If a singular row entry is detected, set that row to a trivial equation.
     // This equation is designed to force pi_k to be zero.
     if (row_is_bad<1e-16) {
         for (i=0; i<neq; i++) A[k*neq+i] = 0.0;
-        A[k*neq + k+1] = 1.0;
+        A[k*neq + k+offset] = 1.0;
         B[k] = 0.0;
     }
 }
