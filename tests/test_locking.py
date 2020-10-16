@@ -34,7 +34,9 @@ class TestCEQ(unittest.TestCase):
         ns0= Xs0/Mmix
         bi0 = (aij*ns0).sum(axis=1)
 
-        Xs1 = ceq.pt(p, T, Xs0, 0)
+        verbosity=0
+        if verbose: verbosity=2
+        Xs1 = ceq.pt(p, T, Xs0, verbosity)
 
         if verbose:
             print("Name  Init       Computed   Diff")

@@ -56,14 +56,18 @@ void handle_trace_species_locking(double* a, double n, int nsp, int nel, double*
         }
     }
 
+    // Sometimes the initial bi0 arrays can contain trace amounts of species in them,
+    // if the solver has gone and eliminated all of these species, we need to set bi0
+    // to zero to make sure that the convergence check works.
+    // This routine does that, albeit a bit crudely. Watch out for possible problems
+    // if some of those elements get unlocked after this goes off!
     for (i=0; i<nel; i++){
         bi = 0.0;
         for (s=0; s<nsp; s++){
             bi += a[i*nsp + s]*ns[s];
-            }
-
+        }
         if (bi<1e-16) {
-            if (verbose>1) printf("        bi[%d]: %f locking b90\n",i,bi);
+            if (verbose>1) printf("        element bi[%d]: %f, zeroing b0\n",i,bi);
             bi0[i] = 0.0;
         }
     }
@@ -101,19 +105,11 @@ void composition_guess(double* a,double* M,double* X0,int nsp,int nel,double* ns
 
     n = 0.0;
     for (s=0; s<nsp; s++) n += ns[s];
-    // This seemed to be a consistent cause of trouble. Maybe use fmax to prevent initial zeros?
-    //for (s=0; s<nsp; s++) ns[s] = n/nsp;   
     for (s=0; s<nsp; s++) ns[s] = fmax(ns[s], n*TRACELIMIT*100.0);
     *np = n;
 
     // Auto lock species with missing elements
-    for (i=0; i<nel; i++){
-        if (bi0[i] < 1e-16) {
-            for (s=0; s<nsp; s++) {
-                if (a[i*nsp + s]!=0) ns[s] = 0.0;
-            }
-        }
-    }
+    // Code removed (16/10/2020)
     return;
 }
 
