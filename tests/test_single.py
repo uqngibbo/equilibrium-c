@@ -71,5 +71,21 @@ class TestCEQ(unittest.TestCase):
         assert_array_almost_equal(Xs1, Xst, decimal=8)
         self.assertAlmostEqual(Teq, T, 4)
 
+    def test_rhot(self):
+        spnames = ['CO2', 'CO', 'O2']
+        T = 2500.0
+        p = 0.1*101.35e3
+        Xs0 = array([1.0, 0.0, 0.0])
+        Xst = array([0.66010397,  0.22659735,  0.11329868])
+        ceq = pyeq.EqCalculator(spnames)
+
+        Mt = sum(Xst*ceq.M)
+        Rt = Ru/Mt
+        rhot = p/Rt/T
+
+        Xs1 = ceq.rhot(rhot, T, Xs0, 0)
+        assert_array_almost_equal(Xs1, Xst, decimal=7) # Seven?
+        return
+
 if __name__=='__main__':
     unittest.main()
