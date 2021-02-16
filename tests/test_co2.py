@@ -12,15 +12,15 @@ from os import system
 from re import search,split
 
 def get_cea_test(p,T,spnames):
-    with open('ceatests/template.inp') as fp: text=fp.read()
-    text = text.replace('PRESSURE', str(p/101.35e3))
-    text = text.replace('TEMPERATURE', str(T))
-    with open('ceatests/co2.inp','w') as fp: fp.write(text)
+    #with open('ceatests/template.inp') as fp: text=fp.read()
+    #text = text.replace('PRESSURE', str(p/101.35e3))
+    #text = text.replace('TEMPERATURE', str(T))
+    #with open('ceatests/co2.inp','w') as fp: fp.write(text)
 
-    system('cea2 ceatests/co2') 
+    #system('cea2 ceatests/co2') 
     with open('ceatests/co2.out') as fp: text=fp.read()
 
-    regexstring = 'MOLE FRACTIONS\n\n( [\*]*[\S]+[\s]+[\s\.\d-]+\n)+\n'
+    regexstring = r'MOLE FRACTIONS\n\n( [\*]*[\S]+[\s]+[\s\.\d-]+\n)+\n'
     match = search(regexstring,text)
     if match==None: raise Exception("No match find in file!")
 
