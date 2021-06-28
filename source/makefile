@@ -31,7 +31,7 @@ rhot.o: rhot.c thermo.h linalg.h common.h rhot.h
 ceq.o: ceq.c thermo.h pt.h rhou.h ps.h rhot.h ceq.h
 	$(CC) $(CFLAGS) -c ceq.c
 
-install: 
+install: all
 	mkdir -p $(INSTALL_DIR)
 	cp libceq.so $(INSTALL_DIR)
 	sed -e "s+DBPATH='../thermo.inp'+DBPATH='$(INSTALL_DIR)/thermo.inp'+" \
