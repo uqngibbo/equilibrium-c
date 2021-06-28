@@ -16,7 +16,8 @@ class TestCEQ(unittest.TestCase):
         T = 2500.0
         p = 0.1*101.35e3
         Xs0 = array([0.76, 0.23, 0.0, 0.0, 0.0])
-        Xst = array([0.74854377, 0.20836613, 0.0, 0.0207646, 0.0223255] )
+        Xst = array([7.48543073e-01, 2.08366049e-01, 7.93468988e-07, 2.07645979e-02, 2.23254866e-02])
+
         ceq = pyeq.EqCalculator(spnames)
 
         Xs1 = ceq.pt(p, T, Xs0, 0)
@@ -33,7 +34,7 @@ class TestCEQ(unittest.TestCase):
         T = 2500.0
         p = 0.1*101.35e3
         Xs0 = array([0.76, 0.23, 0.0, 0.0, 0.0])
-        Xst = array([0.74854377, 0.20836613, 0.0, 0.0207646, 0.0223255] )
+        Xst = array([7.48543073e-01, 2.08366049e-01, 7.93468988e-07, 2.07645979e-02, 2.23254866e-02])
         ceq = pyeq.EqCalculator(spnames)
 
         Mt = sum(Xst*ceq.M)
@@ -60,7 +61,7 @@ class TestCEQ(unittest.TestCase):
         T = 2500.0
         p = 0.1*101.35e3
         Xs0 = array([0.76, 0.23, 0.0, 0.0, 0.0])
-        Xst = array([0.74854377, 0.20836613, 0.0, 0.0207646, 0.0223255] )
+        Xst = array([7.48543073e-01, 2.08366049e-01, 7.93468988e-07, 2.07645979e-02, 2.23254866e-02])
         ceq = pyeq.EqCalculator(spnames)
 
         Mt = sum(Xst*ceq.M)

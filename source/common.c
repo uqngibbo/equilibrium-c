@@ -9,8 +9,8 @@ C library for equilibrium chemistry calculations
 #include <math.h>
 #include <stdlib.h>
 
-const double TRACELIMIT=1e-6;   // Trace species limiter (for ns/n)
-const double tol=1e-9;
+const double TRACELIMIT=1e-8;   // Trace species limiter (for ns/n)
+const double tol=1e-10;
 const int attempts=50;
 
 double update_limit_factor(double x, double dx, double fac){

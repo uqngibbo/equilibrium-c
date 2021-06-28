@@ -74,5 +74,22 @@ class TestCEQ(unittest.TestCase):
         assert_array_almost_equal(Xs1, Xst, decimal=4)
         self.assertAlmostEqual(Teq, T, 0)
 
+    def test_11_sp(self):
+        spnames = ['N2', 'N2+', 'NO', 'NO+', 'O2', 'O2+', 'N', 'N+', 'O', 'O+', 'e-']
+        T = 9000.0
+        p = 0.1*101.35e3
+        Xs0 = array([0.77, 0.0, 0.0, 0.0, 0.23, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        Xs0/=(Xs0.sum())
+        ceq = pyeq.EqCalculator(spnames)
+        Xst = array([1.12808714e-03, 1.66990829e-05, 2.62323131e-05, 5.67521824e-05,
+                     3.98415990e-07, 1.05942060e-07, 7.27382202e-01, 2.12663187e-02,
+                     2.19710628e-01, 4.53634979e-03, 2.58762257e-02])
+
+
+        Xs1 = ceq.pt(p, T, Xs0, 0)
+        print("Ys1: ", ceq.XtoY(Xs1))
+        print("Xs1: ", dict(zip(spnames, Xs1)))
+        assert_array_almost_equal(Xs1, Xst, decimal=8)
+
 if __name__=='__main__':
     unittest.main()
