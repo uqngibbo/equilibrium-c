@@ -20,12 +20,15 @@
 
 - Build Instructions
 
-    Add your preferred install directory to the INSTALL_DIR variable in the file source/makefile.\
-    Then type:\
+    To build and install in '$HOME/ceq' type:\
     $ cd source\
-    $ make ceq\
+    $ make all\
     $ make install
-    
+
+
+    Installation in a custom directory is accomplished by the INSTALL_DIR variable:\
+    $ make install INSTALL_DIR='/path/to/install/dir'
+
 
     Once installed, add the location to your PYTHONPATH in your .bashrc file:\
     export PYTHONPATH=${PYTHONPATH}:'/path/to/install/dir'
