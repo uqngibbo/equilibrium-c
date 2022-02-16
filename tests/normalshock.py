@@ -124,11 +124,11 @@ def guess(s1):
     return array([p2, T2, v2])
 
 if __name__=='__main__':
-    # T4 shot 12033 conditions
+    # Arbitrary conditions
     spnames = ['N2', 'N2+', 'NO', 'NO+', 'O2', 'O2+', 'N', 'N+', 'O', 'O+', 'e-']
     X0 = array([0.77, 0.0, 0.0, 0.0, 0.23, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     X0/=(X0.sum())
-    p1=40000; T1=300; vi=3000.0
+    p1=40000; T1=300; vi=6000.0
 
     ceq = pyeq.EqCalculator(spnames)
 
