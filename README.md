@@ -20,7 +20,7 @@
 
 - Build Instructions
 
-    To build and install in '$HOME/ceq' type:\
+    To build and install in '$HOME/ceqinst' type:\
     $ cd source\
     $ make all\
     $ make install
@@ -31,12 +31,13 @@
 
 
     Once installed, add the location to your PYTHONPATH in your .bashrc file:\
-    export PYTHONPATH=${PYTHONPATH}:'/path/to/install/dir'
+    export PYTHONPATH=${PYTHONPATH}:${HOME}/ceqinst
+
 
 
 - Use Instructions
 
-    The code is accessed through a python script that handles reading of data, memory management, and initialisation. All of this data is then passed to a set of c routines that do most of the actual work. See examples in the "tests" directory.
+    The code is accessed through a python script that handles reading of data, memory management, and initialisation. All of this data is then passed to a set of c routines that do most of the actual work. See examples in the "examples" directory.
 
 ```python
 from numpy import array

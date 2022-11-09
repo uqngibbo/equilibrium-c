@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS := -I. -fPIC -Wall -std=c99 -O3
-INSTALL_DIR ?= $(HOME)/ceq
+INSTALL_DIR ?= $(HOME)/ceqinst
 
 all: thermo.o linalg.o common.o pt.o rhou.o ps.o rhot.o ceq.o
 	$(CC) $(CFLAGS) -shared thermo.o linalg.o common.o pt.o rhou.o ps.o rhot.o ceq.o -lm -o libceq.so
