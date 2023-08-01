@@ -19,10 +19,12 @@ from numpy import array, zeros, log
 from ctypes import cdll,c_double,POINTER,c_int,byref
 from clib import *
 
+# Keep these files together. The code will look in the directory
+# where this file is placed for the following:
+DBPATH =     __file__.replace('pyeq.py', 'thermo.inp')
+LIBPATH =    __file__.replace('pyeq.py', 'libceq.so')
+HEADERFILE = __file__.replace('pyeq.py', 'ceq.h')
 letters = set(ascii_letters)
-DBPATH='../thermo.inp'
-LIBPATH='./libceq.so'
-HEADERFILE='./ceq.h'
 
 class EqCalculator(object):
     """ Python interface to low level ceq routines """
