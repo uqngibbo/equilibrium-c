@@ -49,7 +49,7 @@ class GasState(object):
 
     @classmethod
     def from_rhouv(cls, rho, u, v, X0, ceq):
-        X, T = preshock.ceq.rhou(rho, u, X0, 0)
+        X, T = ceq.rhou(rho, u, X0, 0)
         Mmix = (ceq.M*X).sum()
         R = Ru/Mmix
         p = rho*R*T
@@ -67,6 +67,28 @@ class GasState(object):
     def Mach_number(self):
         a = self.soundspeed()
         return self.v/a
+
+    def expand_isentropically_to_p(self, p):
+        state_ht = self.h + self.v**2/2.0
+        X, T = self.ceq.ps(p, self.s, self.X0)
+        h = self.ceq.get_h(X, T)
+        if state_ht<h: raise Exception("Thermo Error: Too much expansion requested: p={}".format(p))
+
+        v = (2.0*(state_ht - h))**0.5
+        newstate = self.new_from_pTv(p, T, v)
+        return newstate
+    
+    def pitot_pressure(self):
+        if self.M>1.0:
+            postshock = normal_shock(self)
+        else:
+            postshock = copy(self)
+    
+        ht = postshock.h + postshock.v**2/2.0
+        sps = postshock.s
+        stagnation_enthalpy_error = lambda p : self.ceq.get_h(*self.ceq.ps(p, sps, postshock.X0)) - ht
+        pstag = newton(stagnation_enthalpy_error, postshock.p*1.1) 
+        return pstag
 
     def __repr__(self):
         s = [
@@ -87,8 +109,8 @@ def fluxes(gs):
 
 def rhopu_from_v(v, preshock):
     Fmass, Fspecies, Fmom, Fenergy = fluxes(preshock)
-    Y0 = array([Fsps/Fmass for Fsps in Fspecies])
-    X0 = preshock.ceq.YtoX(Y0)
+    #Y0 = array([Fsps/Fmass for Fsps in Fspecies])
+    #X0 = preshock.ceq.YtoX(Y0)
 
     rho = Fmass/v
     p = Fmom - rho*v**2
@@ -113,6 +135,21 @@ def pressure_error_from_v(v, preshock):
 
     return (p - postshock.p)/p
 
+def pressure_error_from_v_reflected(v_reflected, preshock):
+    """ For a reflected shock, we know that the postshock gas should be stationary """
+    # This v is the velocity of the incoming flow in the reflected shock reference frame
+    v2_dash = preshock.v + v_reflected
+    v2_dash = max(1.0, v2_dash)
+    preshock_rsf = preshock.new_from_pTv(preshock.p, preshock.T, v2_dash)
+
+    # In the reflected shock frame, the postshock gas is moving at v_reflected
+    rho, p, u = rhopu_from_v(v_reflected, preshock_rsf)
+    postshock = preshock_rsf.new_from_rhouv(rho, u, v_reflected)
+
+    # As above, the difference between the poshock pressure and p is an indication
+    # of how good our guess of v_reflected is
+    return (p - postshock.p)/p
+
 def guess(s1):
     """ Guess initial postshock conditions using ideal gas behaviour """
     k = s1.k; R = s1.R; M1 = s1.M
@@ -122,6 +159,58 @@ def guess(s1):
     M2= ((M1**2*(k-1)+2)/(2*k*M1**2-(k-1)))**0.5
     v2 = M2*(k*R*T2)**0.5
     return array([p2, T2, v2])
+
+def guess_reflected(s1):
+    """ Guess post reflected shock conditions using ideal gas behaviour """
+    k = s1.k; R = s1.R; M2 = s1.M;
+
+    # I got this expression from Ingo Jahn's Drummon Tunnel prac sheet
+    # It's the velocity of the incoming gas in the reflected shock 
+    # reference frame, assuming M2 is the post incident shock velocity 
+    # in the Lab frame. Okay.
+    Mr = (k+1)/4.0*M2 + (1+(k+1)**2/16.0*M2**2)**0.5
+
+    p5 = s1.p*(2*k*Mr**2-(k-1))/(k+1)
+    T5 = s1.T*(2*k*Mr**2-(k-1))*((k-1)*Mr**2+2.)/((k+1)**2*Mr**2)
+    M5_dash = ((Mr**2*(k-1)+2)/(2*k*Mr**2-(k-1)))**0.5
+    v5_dash = M5_dash*(k*R*T5)**0.5
+    return array([p5, T5, v5_dash])
+
+def normal_shock(preshock, verbose=False):
+    start = guess(preshock)
+    if verbose:
+        print("guess:\n p={} T={} v={}\n".format(*start))
+
+    # Compute a normal shock by solving for function f=0.0
+    f = lambda v : pressure_error_from_v(v, preshock)
+    vpostshock = newton(f, start[2]) # guess velocity is start[2]
+
+    # With the correct velocity found, compute the postshock state
+    rho, p, u = rhopu_from_v(vpostshock, preshock)
+    postshock = preshock.new_from_rhouv(rho, u, vpostshock)
+    return postshock
+
+def reflected_normal_shock(preshock, verbose=False):
+    """
+    Do a normal shock reflection where the post shock gas
+    is stagnant in the lab reference frame.
+    """
+    start = guess_reflected(preshock)
+    if verbose:
+        print("guess:\n p={} T={} v={}\n".format(*start))
+
+    # Compute a normal shock by solving for function f=0.0
+    f = lambda v_reflected : pressure_error_from_v_reflected(v_reflected, preshock)
+    v_reflected = newton(f, start[2]) # guess velocity is start[2]
+
+    # With the correct velocity found, compute the postshock state
+    v2_dash = preshock.v + v_reflected
+    preshock_rsf = preshock.new_from_pTv(preshock.p, preshock.T, v2_dash)
+    rho, p, u = rhopu_from_v(v_reflected, preshock_rsf)
+    postshock = preshock_rsf.new_from_rhouv(rho, u, v_reflected)
+
+    return postshock
+
 
 if __name__=='__main__':
     # Arbitrary conditions
@@ -133,21 +222,12 @@ if __name__=='__main__':
     ceq = pyeq.EqCalculator(spnames)
 
     preshock = GasState.from_pTv(p=p1, T=T1, v=vi, X0=X0, ceq=ceq)
-    start = guess(preshock)
     print("preshock:\n", preshock, '\n')
-    print("guess:\n p={} T={} v={}\n".format(*start))
 
-    # Compute a normal shock by solving for function f=0.0
-    f = lambda v : pressure_error_from_v(v, preshock)
-    vpostshock = newton(f, start[2]) # guess velocity is start[2]
-
-    # With the correct velocity found, compute the postshock state
-    rho, p, u = rhopu_from_v(vpostshock, preshock)
-    postshock = preshock.new_from_rhouv(rho, u, vpostshock)
-    ionisation_fraction = postshock.X[spnames.index('e-')]*2
-
+    postshock = normal_shock(preshock)
     print("postshock:\n", postshock, '\n')
 
+    ionisation_fraction = postshock.X[spnames.index('e-')]*2
     print("Ionization fraction: {:g} %".format(ionisation_fraction*100))
 
 
