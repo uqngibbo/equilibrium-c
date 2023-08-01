@@ -34,10 +34,7 @@ ceq.o: ceq.c thermo.h pt.h rhou.h ps.h rhot.h ceq.h
 install: all
 	mkdir -p $(INSTALL_DIR)
 	cp libceq.so $(INSTALL_DIR)
-	sed -e "s+DBPATH='../thermo.inp'+DBPATH='$(INSTALL_DIR)/thermo.inp'+" \
-        -e "s+LIBPATH='./libceq.so'+LIBPATH='$(INSTALL_DIR)/libceq.so'+" \
-	    -e "s+HEADERFILE='./ceq.h'+HEADERFILE='$(INSTALL_DIR)/ceq.h'+" \
-        pyeq.py > $(INSTALL_DIR)/pyeq.py
+	cp 'pyeq.py' $(INSTALL_DIR)
 	cp 'clib.py' $(INSTALL_DIR)
 	cp '../thermo.inp' $(INSTALL_DIR)
 	cp 'ceq.h' $(INSTALL_DIR)
