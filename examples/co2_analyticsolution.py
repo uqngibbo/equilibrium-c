@@ -3,8 +3,9 @@ A simple CO2 dissociation problem, for the paper
 
 @author: Nick Gibbons
 """
-from numpy import array,exp,cbrt,roots
+from numpy import array,exp,cbrt,roots,linspace,zeros
 import numpy as np
+import matplotlib.pyplot as plt
 import pyeq
 
 sqrt = np.emath.sqrt
@@ -19,12 +20,15 @@ Ru = 8.314
 po = 101.35e3
 nu = [-1.0,1.0, 0.5]
 ps= [0.1*101.35e3, 1*101.35e3, 10*101.35e3, 100*101.35e3]
-Xs0 = array([1.0, 0.0, 0.0])
 
+fig = plt.figure(figsize=(12,4))
+axes = fig.subplots(1,3)
 
-for T in sorted(gT.keys()):
-    for p in ps:
-        G = sum(gj*nuj for gj,nuj in zip(gT[int(T)], nu))
+for i,p in enumerate(ps):
+    Ts = sorted(gT.keys())
+    Xss = []
+    for T in Ts:
+        G = sum(gj*nuj for gj,nuj in zip(gT[T], nu))
         Kp = exp(-G/Ru/T)
 
         alpha_coeffs = [
@@ -39,14 +43,34 @@ for T in sorted(gT.keys()):
 
         total = 1.0 + alpha/2.0
         Xans = [(1.0-alpha)/total, alpha/total, alpha/2.0/total]
-
-        ceq = pyeq.EqCalculator(spnames)
-        Xs1 = ceq.pt(p, T, Xs0, 0)
+        Xss.append(Xans)
 
         print("Test: T={} K   p={} (Pa)".format(T, p))
 
-        print("Name  Mole Fraction")
-        for name, molef, molef2 in zip(spnames, Xs1, Xans):
-            print(" {:>2s}   {:<13.8g}   {:<13.8g}".format(name,molef,molef2))
-        print(" ")
 
+    Xss = array(Xss)
+    axes[0].semilogy(Ts, Xss[:,0], linestyle="none", marker='o', color='black', linewidth=0.5+0.5*i)
+    axes[1].semilogy(Ts, Xss[:,1], linestyle="none", marker='o', color='blue', linewidth=0.5+0.5*i)
+    axes[2].semilogy(Ts, Xss[:,2], linestyle="none", marker='o', color='red', linewidth=0.5+0.5*i)
+
+    Tss = linspace(Ts[0], Ts[-1])
+    pss = Tss*0.0 + p
+    Xs0 = zeros((Tss.size, len(spnames)))
+    Xs0[:,0] = 1.0
+    ceq = pyeq.EqCalculator(spnames)
+    Xs1 = ceq.batch_pt(pss, Tss, Xs0, 0)
+    axes[0].semilogy(Tss, Xs1[:,0], color='black', linewidth=0.5+0.5*i, label="{:3.1f} Atms".format(p/po))
+    axes[1].semilogy(Tss, Xs1[:,1], color='blue', linewidth=0.5+0.5*i)
+    axes[2].semilogy(Tss, Xs1[:,2], color='red', linewidth=0.5+0.5*i)
+
+axes[0].set_title('CO2')
+axes[1].set_title('CO')
+axes[2].set_title('O2')
+
+axes[0].legend(loc=0)
+axes[0].set_ylabel('Mole Fraction')
+axes[0].set_xlabel('Temperature (K)')
+axes[1].set_xlabel('Temperature (K)')
+axes[2].set_xlabel('Temperature (K)')
+fig.tight_layout()
+plt.show()
