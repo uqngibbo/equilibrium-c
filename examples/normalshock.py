@@ -183,7 +183,7 @@ def normal_shock(preshock, verbose=False):
 
     # Compute a normal shock by solving for function f=0.0
     f = lambda v : pressure_error_from_v(v, preshock)
-    vpostshock = newton(f, start[2]) # guess velocity is start[2]
+    vpostshock = newton(f, start[2]/2) # guess velocity is start[2]
 
     # With the correct velocity found, compute the postshock state
     rho, p, u = rhopu_from_v(vpostshock, preshock)
@@ -217,7 +217,7 @@ if __name__=='__main__':
     spnames = ['N2', 'N2+', 'NO', 'NO+', 'O2', 'O2+', 'N', 'N+', 'O', 'O+', 'e-']
     X0 = array([0.77, 0.0, 0.0, 0.0, 0.23, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     X0/=(X0.sum())
-    p1=40000; T1=300; vi=6000.0
+    p1=600; T1=300; vi=6000.0
 
     ceq = pyeq.EqCalculator(spnames)
 
@@ -230,5 +230,11 @@ if __name__=='__main__':
     ionisation_fraction = postshock.X[spnames.index('e-')]*2
     print("Ionization fraction: {:g} %".format(ionisation_fraction*100))
 
-
+    Nav = 6.02214076e+23
+    Y = ceq.XtoY(postshock.X)
+    eidx = spnames.index('e-')
+    Me = ceq.M[eidx]
+    rhoe = postshock.rho*Y[eidx]
+    ne = rhoe*Nav/Me
+    print("Electron Number Density: {:e}".format(ne))
 
