@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pyeq
 
-sqrt = np.emath.sqrt
+#sqrt = np.emath.sqrt
 #Gibbs free energy at standard pressure of one atmosphere
 spnames =    [    "CO2",      "CO", "O2"]
 gT = {1500 : [-396352.0, -243674.0, 0.0],
