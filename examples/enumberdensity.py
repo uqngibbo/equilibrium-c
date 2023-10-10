@@ -15,6 +15,9 @@ from atmo import US76Atmo
 from normalshock import *
 import pyeq
 
+plt.rcParams.update({'font.size': 12})
+plt.rcParams['svg.fonttype'] = 'none'
+
 spnames = ['N2', 'N2+', 'NO', 'NO+', 'O2', 'O2+', 'N', 'N+', 'O', 'O+', 'e-']
 X0 = array([0.77, 0.0, 0.0, 0.0, 0.23, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 X0/=(X0.sum())
