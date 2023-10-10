@@ -214,8 +214,8 @@ def reflected_normal_shock(preshock, verbose=False):
 
 if __name__=='__main__':
     # Arbitrary conditions
-    spnames = ['N2', 'N2+', 'NO', 'NO+', 'O2', 'O2+', 'N', 'N+', 'O', 'O+', 'e-']
-    X0 = array([0.77, 0.0, 0.0, 0.0, 0.23, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    spnames = ['N2', 'N2+', 'NO', 'NO+', 'O2', 'O-', 'N', 'N+', 'O', 'O+', 'e-']
+    X0 = array([0.767, 0.0, 0.0, 0.0, 0.233, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     X0/=(X0.sum())
     p1=600; T1=300; vi=6000.0
 
@@ -237,4 +237,49 @@ if __name__=='__main__':
     rhoe = postshock.rho*Y[eidx]
     ne = rhoe*Nav/Me
     print("Electron Number Density: {:e}".format(ne))
+
+    # Compare to CEA shock problem:
+    # MOLE FRACTIONS
+    output = """
+         U2, M/SEC         474.76
+         RHO, KG/CU M    8.9149-2
+         P, BAR            2.3447
+         T, K             6568.51
+        *e-             3.5760-4
+        *N              2.3939-1
+        *N+             1.0167-5
+        *NO             8.5898-3
+        *NO+            3.2993-4
+        *N2             4.2615-1
+        *N2+            4.0200-6
+        *O              3.2489-1
+        *O+             1.4390-5
+        *O-             1.0156-6
+        *O2             2.6103-4
+    """
+    ceadata = {}
+    for line in output.splitlines():
+        line = line.strip()
+        if len(line)==0: continue
+
+        items = line.strip().split()
+        k = items[0]
+        v = items[-1]
+        spname = k.strip().lstrip('*').rstrip(',')
+        value = float(v.strip().replace('-','e-'))
+        ceadata[spname] = value
+
+    formatdiff = lambda a,b : "{:<9.1f}  {:<9.1f}  ({:<4.2f} %)".format(a, b, abs(a-b)/a*100)
+    eformatdiff = lambda a,b : "{:<8.3e}  {:<8.3e}  ({:<4.2f} %)".format(a, b, abs(a-b)/a*100)
+    print("Postshock Gas State:")
+    print("           ceq        CEA        (% diff)")
+    print("-------------------------------------------")
+    print(" v (m/s)|  {}".format(formatdiff(postshock.v, ceadata['U2'])))
+    print(" T (K)  |  {}".format(formatdiff(postshock.T, ceadata['T'])))
+    print(" p (Pa) |  {}".format(formatdiff(postshock.p, ceadata['P']*1e5)))
+
+    sp_ordered = [name for _,name in sorted(zip(postshock.X, spnames), reverse=True)]
+    for spname in sp_ordered:
+        idx = spnames.index(spname)
+        print(" X {:3}  |  {}".format(spname, eformatdiff(postshock.X[idx], ceadata[spname])))
 
