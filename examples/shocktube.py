@@ -14,26 +14,24 @@ import pyeq
 def stnp(p1, T1, vi, Ys1, pe, pp_on_pe):
     spnames = list(Ys1.keys())
     Y1 = array(list(Ys1.values()))
-    print(spnames)
 
     ceq = pyeq.EqCalculator(spnames)
 
     Mmix = (Y1/ceq.M).sum()
     Mmix = Mmix**-1
     X0 = Y1*Mmix/ceq.M
-    print(X0)
 
     # Shock tube fill condition in incident shock frame (ISF)
     s1_isf = GasState.from_pTv(p=p1, T=T1, v=vi, X0=X0, ceq=ceq)
-    print("s1\n", s1_isf, '\n')
+    #print("s1\n", s1_isf, '\n')
 
     # Compute state 2 in incident shock frame
     s2_isf = normal_shock(s1_isf)
-    print("s2_isf\n", s2_isf, '\n')
+    #print("s2_isf\n", s2_isf, '\n')
 
     # Transform s2 into lab frame
     s2 = s2_isf.new_from_pTv(s2_isf.p, s2_isf.T, s1_isf.v - s2_isf.v)
-    print("s2\n", s2, '\n')
+    #print("s2\n", s2, '\n')
 
     # Compute reflected shock state
     s5_rsf = reflected_normal_shock(s2)
@@ -41,24 +39,24 @@ def stnp(p1, T1, vi, Ys1, pe, pp_on_pe):
     s5 = copy(s5_rsf)
     s5.v = 0.0
     s5.M = 0.0
-    print("s5\n", s5, '\n')
+    #print("s5\n", s5, '\n')
 
     # Compute relaxed stagnation state
     s5s_X, s5s_T = ceq.ps(pe, s5.s, X0)
     s5s = GasState.from_pTv(pe, s5s_T, 0.0, s5s_X, ceq=ceq)
-    print("s5s\n", s5s, '\n')
+    #print("s5s\n", s5s, '\n')
 
     # Compute nozzle throat state
     expand_to_M1 = lambda p : (s5s.expand_isentropically_to_p(p)).M - 1.0
     p6 = newton(expand_to_M1, s5s.p/2.0)
     s6 = s5s.expand_isentropically_to_p(p6)
-    print("s6\n", s6, '\n')
+    #print("s6\n", s6, '\n')
 
     # Compute nozzle exit state 
     expand_to_pp_on_pe = lambda p : (s5s.expand_isentropically_to_p(p)).pitot_pressure()/s5s.p - pp_on_pe
     p7 = newton(expand_to_pp_on_pe, s5s.p*0.01)
     s7 = s5s.expand_isentropically_to_p(p7)
-    print("s7\n", s7, '\n')
+    #print("s7\n", s7, '\n')
     return [s1_isf, s2, s5, s5s, s6, s7]
 
 if __name__=='__main__':
@@ -70,8 +68,8 @@ if __name__=='__main__':
     pp_on_pe = 0.12
     states = stnp(p1, T1, vi, Ys1, pe, pp_on_pe)
 
-    #for sname,s in zip(['s1, s2, s5, s5s, s6, s7'], states):
-    #    print(sname)
-    #    print(s)
-    #    print(" ")
+    for sname,s in zip('s1 s2 s5 s5s s6 s7'.split(), states):
+        print(sname)
+        print(s)
+        print(" ")
 

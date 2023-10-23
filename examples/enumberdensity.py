@@ -40,6 +40,7 @@ pvs = zeros(hs.shape)
 Xs  = zeros((hs.shape[0], hs.shape[1], len(spnames)))
 
 ni,nj = hs.shape
+lowest = 1e99
 
 ii = 0
 for i in range(ni):
@@ -65,7 +66,8 @@ for i in range(ni):
 
         #print("ii={} v={} h={} p={} T={} -> ne: {:e}".format(ii, V, h, postshock.p, postshock.T, ne))
 
-        ends[i,j] = log10(max(ne,1e15))
+        if (ne!=0.0): lowest = min(lowest, log10(ne))
+        ends[i,j] = log10(max(ne,1e10))
         ifs[i,j] = log10(max(ionisation_fraction,1e-10))
         Ms[i,j] = M
         rhos[i,j] = postshock.rho
@@ -76,7 +78,7 @@ for i in range(ni):
         ii += 1
 
 thing = ends
-
+print("Lowest ne was :", lowest)
 print("min: ", thing.min(), "max: ", thing.max())
 minlevel = floor(thing.min())
 maxlevel = floor(thing.max())+1
@@ -84,9 +86,9 @@ nlevels = int(round((maxlevel-minlevel), 0))
 print("minlevel: ", minlevel, " maxlevel: ", maxlevel, "nlevels: ", nlevels)
 levels = linspace(minlevel, maxlevel, nlevels+1)
 
-fig = plt.figure(figsize=((7.5,5)))
+fig = plt.figure(figsize=((8.5,5)))
 axes = fig.subplots(1,1)
-cs = axes.contourf(vs,hs/1e3,thing,cmap=cm.spring, levels=levels)
+cs = axes.contourf(vs,hs/1e3,thing,cmap=cm.autumn, levels=levels)
 
 axes.set_ylabel('Altitude (km)')
 axes.set_xlabel('Velocity (m/s)')
@@ -115,7 +117,7 @@ cs.set_norm(norm)
 #cbar = fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.spring),
 #             ax=axes, orientation='horizontal', label='Ionisation Fraction',
 #             format=FuncFormatter(lambda s, pos : "$10^{:d}$".format(int(s))))
-cbar = fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.spring),
+cbar = fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.autumn),
              ax=axes, orientation='horizontal', label='log10(Electron Number Density)')
              #format=FuncFormatter(lambda s, pos : "$10^{:d}$".format(int(s))))
 cbar.set_ticks(levels)
