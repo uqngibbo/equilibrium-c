@@ -87,7 +87,7 @@ class GasState(object):
         ht = postshock.h + postshock.v**2/2.0
         sps = postshock.s
         stagnation_enthalpy_error = lambda p : self.ceq.get_h(*self.ceq.ps(p, sps, postshock.X0)) - ht
-        pstag = newton(stagnation_enthalpy_error, postshock.p*1.1) 
+        pstag = newton(stagnation_enthalpy_error, postshock.p*1.2) 
         return pstag
 
     def __repr__(self):
