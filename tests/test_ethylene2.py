@@ -1,5 +1,5 @@
 """
-Test code for ceq: near zero trace species
+Test code for eq: near zero trace species
 
 @author: Nick Gibbons
 """
@@ -7,7 +7,7 @@ Test code for ceq: near zero trace species
 import unittest
 from numpy import array, zeros, absolute
 from numpy.testing import assert_array_almost_equal
-import pyeq
+import eqc
 
 class TestCEQ(unittest.TestCase):
     def test_pt(self, verbose=False):
@@ -33,12 +33,12 @@ class TestCEQ(unittest.TestCase):
         Xst[5]=1.3102e-1
         Xst[6]=1.3072e-1
 
-        ceq = pyeq.EqCalculator(spnames)
+        eq = eqc.EqCalculator(spnames)
 
-        a = ceq.a
-        M = ceq.M
-        nel = ceq.nel
-        nsp = ceq.nsp
+        a = eq.a
+        M = eq.M
+        nel = eq.nel
+        nsp = eq.nsp
 
         aij = a.reshape(nel,nsp).copy()
         Mmix = sum(Xs0*M)
@@ -48,7 +48,7 @@ class TestCEQ(unittest.TestCase):
 
         verbosity = 0
         if verbose: verbosity=2
-        Xs1 = ceq.pt(p, T, Xs0, verbosity)
+        Xs1 = eq.pt(p, T, Xs0, verbosity)
         
         if verbose:
             print("Name  Init       Target     Computed   Diff")

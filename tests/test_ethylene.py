@@ -1,12 +1,12 @@
 """
-Automated test code for ceq
+Automated test code for eq
 
 @author: Nick Gibbons
 """
 import unittest
 from numpy import array, zeros, absolute
 from numpy.testing import assert_array_almost_equal
-import pyeq
+import eqc
 
 def molef_from_massf(Y,Ms):
     Mmix = sum(Y/Ms)**-1
@@ -15,8 +15,8 @@ def molef_from_massf(Y,Ms):
 class TestCEQ(unittest.TestCase):
     def test_pt(self, verbose=False):
         spnames = 'N2,O2,C2H4,H2,CO,CO2,H2O'.split(',')
-        ceq = pyeq.EqCalculator(spnames)
-        Ms = ceq.M
+        eq = eqc.EqCalculator(spnames)
+        Ms = eq.M
         ceaYs0 = array([0.75,  0.2, 0.05, 0.0, 0.0, 0.0, 0.0])
         ceaXst = {
             'CO': 1.2624e-2,
@@ -38,7 +38,7 @@ class TestCEQ(unittest.TestCase):
         if verbose:
             print("Computing")
             verbosity=2
-        Xs1 = ceq.pt(p, T, Xs0, verbosity)
+        Xs1 = eq.pt(p, T, Xs0, verbosity)
 
         if verbose:
             print("Done")

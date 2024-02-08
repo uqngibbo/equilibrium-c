@@ -1,5 +1,5 @@
 """
-Automated test code for ceq
+Automated test code for eq
 
 @author: Nick Gibbons
 """
@@ -7,7 +7,7 @@ Automated test code for ceq
 import unittest
 from numpy import array, zeros, absolute
 from numpy.testing import assert_array_almost_equal
-import pyeq
+import eqc
 from os import system 
 from re import search,split
 
@@ -41,9 +41,9 @@ class TestCEQ(unittest.TestCase):
         T = 2500.0
         Xs0 = array([1.0, 0.0, 0.0])
 
-        ceq = pyeq.EqCalculator(spnames)
+        eq = eqc.EqCalculator(spnames)
         Xcea1 = get_cea_test(p,T,spnames)
-        Xs1 = ceq.pt(p, T, Xs0)
+        Xs1 = eq.pt(p, T, Xs0)
         assert_array_almost_equal(Xs1, Xcea1, decimal=4)
 
 if __name__=='__main__':

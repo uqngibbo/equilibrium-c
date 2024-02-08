@@ -1,5 +1,5 @@
 """
-Automated test code for ceq
+Automated test code for eq
 
 @author: Nick Gibbons
 """
@@ -8,7 +8,7 @@ from numpy import array, zeros, linspace
 from pylab import semilogy, legend, xlabel, ylabel, title, show, ylim
 from lewis_thermo import get_species
 from os import system 
-import pyeq
+import eqc
 from re import search,split
 
 def get_cea_test(p,T,spnames):
@@ -54,7 +54,7 @@ if __name__=='__main__':
     spnames = ['CO2', 'CO', 'O2']
     Xs0 = array([1.0, 0.0, 0.0])
 
-    ceq = pyeq.EqCalculator(spnames)
+    eq = eqc.EqCalculator(spnames)
     linecolours = ['red','blue','black']
     linestyles = ['-','--']
     markers = ['o','v']
@@ -66,26 +66,26 @@ if __name__=='__main__':
         pi[:] = p
         Xs0i = zeros((Ts.size, Xs0.size))
         Xs0i[:,:] = Xs0
-        Xs1i = ceq.batch_pt(pi, Ts, Xs0i)
+        Xs1i = eq.batch_pt(pi, Ts, Xs0i)
 
         icea = list(range(0,50,int(50/3)-1))
         Tcea = Ts[icea]
         Xcea = array([get_cea_test(p,Ti,spnames) for Ti in Tcea])
-        Xceq = Xs1i[icea,:]
-        print_compare_table(Xceq, Xcea, 'ceq','CEA', Tcea, spnames)
+        Xeq = Xs1i[icea,:]
+        print_compare_table(Xeq, Xcea, 'eq','CEA', Tcea, spnames)
 
         plines = []
         pmarks = []
-        for j in range(ceq.nsp):
+        for j in range(eq.nsp):
             line = semilogy(Ts, Xs1i[:,j], linestyle=linestyles[i], color=linecolours[j])
             plines.extend(line)
             mark = semilogy(Tcea, Xcea[:,j], marker=markers[i],linestyle='None', color=linecolours[j])
             pmarks.extend(mark)
         lines.extend(plines+pmarks)
 
-    lnames = ['']*ceq.nsp*3 + spnames
+    lnames = ['']*eq.nsp*3 + spnames
     ltitle = ' '+'           '.join(['{:8.2}'.format(p/101.35e3) for p in ps]) + '         (atm)\n'
-    ltitle += ' ' + '    '.join(['ceq     CEA' for p in ps])
+    ltitle += ' ' + '    '.join(['eq     CEA' for p in ps])
     xlabel('T (K)')
     ylabel('X')
     ylim(1e-7,10)

@@ -1,12 +1,12 @@
 """
-Automated test code for ceq
+Automated test code for eq
 
 @author: Nick Gibbons
 """
 
 import unittest
 from numpy import array, zeros, absolute, linspace
-import pyeq
+import eqc
 
 class TestCEQ(unittest.TestCase):
     def test_thermo(self, verbose=False):
@@ -14,8 +14,8 @@ class TestCEQ(unittest.TestCase):
         T = 3698.04
         spnames = ['CO2', 'CO', 'O2']
         Xs0 = array([1.0, 0.0, 0.0])
-        ceq = pyeq.EqCalculator(spnames)
-        Xs1 = ceq.pt(p, T, Xs0)
+        eq = eqc.EqCalculator(spnames)
+        Xs1 = eq.pt(p, T, Xs0)
 
         ceaoutput = """
         THERMODYNAMIC PROPERTIES
@@ -44,23 +44,23 @@ class TestCEQ(unittest.TestCase):
         ceadata = [i.strip().split('  ') for i in ceaoutput.splitlines()]
         ceadata = dict([(i[0], float(i[-1])) for i in ceadata if len(i)>2])
         ceaXs1 = array([ceadata['*CO2'], ceadata['*CO'], ceadata['*O2']])
-        ceqdata = {}
-        ceqdata['h'] = ceq.get_h(Xs1, T)
-        ceqdata['u'] = ceq.get_u(Xs1, T)
-        ceqdata['s'] = ceq.get_s(Xs1, T, p)
+        eqdata = {}
+        eqdata['h'] = eq.get_h(Xs1, T)
+        eqdata['u'] = eq.get_u(Xs1, T)
+        eqdata['s'] = eq.get_s(Xs1, T, p)
 
-        self.assertAlmostEqual(ceqdata['h']/1000.0, ceadata['H, KJ/KG'], 1)
-        self.assertAlmostEqual(ceqdata['u']/1000.0, ceadata['U, KJ/KG'], 1)
-        self.assertAlmostEqual(ceqdata['s']/1000.0, ceadata['S, KJ/(KG)(K)'], 4)
+        self.assertAlmostEqual(eqdata['h']/1000.0, ceadata['H, KJ/KG'], 1)
+        self.assertAlmostEqual(eqdata['u']/1000.0, ceadata['U, KJ/KG'], 1)
+        self.assertAlmostEqual(eqdata['s']/1000.0, ceadata['S, KJ/(KG)(K)'], 4)
 
         if verbose:
-            print("          ceq    |   cea")
+            print("          eq    |   cea")
             print("XCO2:   {:8f} |   {:8f} ".format(Xs1[0], ceaXs1[0]))
             print("XCO:    {:8f} |   {:8f} ".format(Xs1[1], ceaXs1[1]))
             print("XO2:    {:8f} |   {:8f} ".format(Xs1[2], ceaXs1[2]))
-            print("h:    {:8f} | {:8f}  (kJ/kg)".format(ceqdata['h']/1000.0, ceadata['H, KJ/KG']))
-            print("u:   {:8f} |{:8f}  (kJ/kg)".format(ceqdata['u']/1000.0, ceadata['U, KJ/KG']))
-            print("s:      {:8f} |   {:8f}  (kJ/kg/K)".format(ceqdata['s']/1000.0, ceadata['S, KJ/(KG)(K)']))
+            print("h:    {:8f} | {:8f}  (kJ/kg)".format(eqdata['h']/1000.0, ceadata['H, KJ/KG']))
+            print("u:   {:8f} |{:8f}  (kJ/kg)".format(eqdata['u']/1000.0, ceadata['U, KJ/KG']))
+            print("s:      {:8f} |   {:8f}  (kJ/kg/K)".format(eqdata['s']/1000.0, ceadata['S, KJ/(KG)(K)']))
 
 if __name__=='__main__':
     unittest.main()

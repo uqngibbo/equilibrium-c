@@ -1,12 +1,12 @@
 """
-Automated test code for ceq
+Automated test code for eq
 
 @author: Nick Gibbons
 """
 import unittest
 from numpy import array, zeros, absolute
 from numpy.testing import assert_array_almost_equal
-import pyeq
+import eqc
 
 class TestCEQ(unittest.TestCase):
     def test_pt(self, verbose=False):
@@ -31,12 +31,12 @@ class TestCEQ(unittest.TestCase):
         Xst[5]=1.3199e-1
         Xst[6]=1.3198e-1
 
-        ceq = pyeq.EqCalculator(spnames)
+        eq = eqc.EqCalculator(spnames)
 
-        a = ceq.a
-        M = ceq.M
-        nel = ceq.nel
-        nsp = ceq.nsp
+        a = eq.a
+        M = eq.M
+        nel = eq.nel
+        nsp = eq.nsp
 
         aij = a.reshape(nel,nsp).copy()
         Mmix = sum(Xs0*M)
@@ -46,7 +46,7 @@ class TestCEQ(unittest.TestCase):
 
         verbosity=0
         if verbose: verbosity=1
-        Xs1 = ceq.pt(p, T, Xs0, verbosity)
+        Xs1 = eq.pt(p, T, Xs0, verbosity)
 
         if verbose:
             print("Done (Fixed conditions @ p={:1.6f} T={:1.6f})".format(p,T))

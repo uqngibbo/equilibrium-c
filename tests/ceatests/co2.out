@@ -1,0 +1,102 @@
+
+ *******************************************************************************
+
+         NASA-GLENN CHEMICAL EQUILIBRIUM PROGRAM CEA2, MAY 21, 2004
+                   BY  BONNIE MCBRIDE AND SANFORD GORDON
+      REFS: NASA RP-1311, PART I, 1994 AND NASA RP-1311, PART II, 1996
+
+ *******************************************************************************
+
+
+
+ prob case=co2test tp
+   p(atm) = 0.1
+   t,k= 2500.0
+ reac
+   name CO2             wt%= 100.00
+ output trace=1e-5
+ only CO2  O2  CO
+ end
+
+ OPTIONS: TP=T  HP=F  SP=F  TV=F  UV=F  SV=F  DETN=F  SHOCK=F  REFL=F  INCD=F
+ RKT=F  FROZ=F  EQL=F  IONS=F  SIUNIT=T  DEBUGF=F  SHKDBG=F  DETDBG=F  TRNSPT=F
+
+ T,K =  2500.0000
+
+ TRACE= 1.00E-05  S/R= 0.000000E+00  H/R= 0.000000E+00  U/R= 0.000000E+00
+
+ P,BAR =     0.101325
+
+    REACTANT          WT.FRAC   (ENERGY/R),K   TEMP,K  DENSITY
+        EXPLODED FORMULA
+ N: CO2              1.000000   0.000000E+00     0.00  0.0000
+          C  1.00000  O  2.00000
+
+  SPECIES BEING CONSIDERED IN THIS SYSTEM
+ (CONDENSED PHASE MAY HAVE NAME LISTED SEVERAL TIMES)
+  LAST thermo.inp UPDATE:    9/09/04
+
+  tpis79  *CO              g 9/99  *CO2             tpis89  *O2            
+
+ O/F =   0.000000
+
+                       EFFECTIVE FUEL     EFFECTIVE OXIDANT        MIXTURE
+ ENTHALPY                  h(2)/R              h(1)/R               h0/R
+ (KG-MOL)(K)/KG        0.00000000E+00      0.00000000E+00      0.00000000E+00
+
+ KG-FORM.WT./KG             bi(2)               bi(1)               b0i
+  C                    0.22722367E-01      0.00000000E+00      0.22722367E-01
+  O                    0.45444734E-01      0.00000000E+00      0.45444734E-01
+
+ POINT ITN      T            C           O 
+   1    8    2500.000     -20.554     -17.025
+
+
+
+
+               THERMODYNAMIC EQUILIBRIUM PROPERTIES AT ASSIGNED
+
+                           TEMPERATURE AND PRESSURE
+
+ CASE = co2test        
+
+             REACTANT                    WT FRACTION      ENERGY      TEMP
+                                          (SEE NOTE)     KJ/KG-MOL      K  
+ NAME        CO2                          1.0000000         0.000      0.000
+
+ O/F=    0.00000  %FUEL=  0.000000  R,EQ.RATIO= 1.000000  PHI,EQ.RATIO= 0.000000
+
+ THERMODYNAMIC PROPERTIES
+
+ P, BAR           0.10132
+ T, K             2500.00
+ RHO, KG/CU M    1.9022-2
+ H, KJ/KG        -4572.94
+ U, KJ/KG        -5105.60
+ G, KJ/KG        -25790.7
+ S, KJ/(KG)(K)     8.4871
+
+ M, (1/n)          39.023
+ (dLV/dLP)t      -1.03171
+ (dLV/dLT)p        1.8399
+ Cp, KJ/(KG)(K)    6.1058
+ GAMMAs            1.0946
+ SON VEL,M/SEC      763.6
+
+ MOLE FRACTIONS
+
+ *CO             2.2661-1
+ *CO2            6.6008-1
+ *O2             1.1331-1
+
+  * THERMODYNAMIC PROPERTIES FITTED TO 20000.K
+
+    PRODUCTS WHICH WERE CONSIDERED BUT WHOSE MOLE FRACTIONS
+    WERE LESS THAN 1.000000E-05 FOR ALL ASSIGNED CONDITIONS
+
+
+
+ NOTE. WEIGHT FRACTION OF FUEL IN TOTAL FUELS AND OF OXIDANT IN TOTAL OXIDANTS
+
+
+

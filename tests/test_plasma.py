@@ -1,12 +1,12 @@
 """
-Automated test code for ceq
+Automated test code for eq
 
 @author: Nick Gibbons
 """
 import unittest
 from numpy import array, zeros, absolute
 from numpy.testing import assert_array_almost_equal
-import pyeq
+import eqc
 
 
 Ru = 8.3144598 # uses gram-moles, or regular moles... to match M in lewis_library
@@ -19,9 +19,9 @@ class TestCEQ(unittest.TestCase):
         Xs0 = array([1.2680e-3, 0.0, 7.7128e-1, 2.2490e-1, 2.8465e-5, 1.3e-3, 1.0e-3])
         Xs0/=(Xs0.sum())
         Xst = array([1.2680e-3, 0.0, 7.7128e-1, 2.2490e-1, 2.8465e-5, 1.2625e-3, 1.2625e-3])
-        ceq = pyeq.EqCalculator(spnames)
+        eq = eqc.EqCalculator(spnames)
 
-        Xs1 = ceq.pt(p, T, Xs0, 0)
+        Xs1 = eq.pt(p, T, Xs0, 0)
         assert_array_almost_equal(Xs1, Xst, decimal=4)
         return
 
@@ -32,9 +32,9 @@ class TestCEQ(unittest.TestCase):
         Xs0 = array([1.2680e-3, 0.0, 7.7128e-1, 2.2490e-1, 2.8465e-5, 1.3e-3, 1.0e-3])
         Xs0/=(Xs0.sum())
         Xst = array([1.2680e-3, 0.0, 7.7128e-1, 2.2490e-1, 2.8465e-5, 1.2625e-3, 1.2625e-3])
-        ceq = pyeq.EqCalculator(spnames)
+        eq = eqc.EqCalculator(spnames)
 
-        Mt = sum(Xst*ceq.M)
+        Mt = sum(Xst*eq.M)
         Rt = Ru/Mt
         rhot = p/Rt/T
         nt = 1/Mt
@@ -42,9 +42,9 @@ class TestCEQ(unittest.TestCase):
         nst = Xst/Mt # also cs/rhot 
         nt2 = nst.sum()
 
-        ut = ceq.get_u(Xst, T)
+        ut = eq.get_u(Xst, T)
 
-        Xs1, Teq = ceq.rhou(rhot, ut, Xs0, 0)
+        Xs1, Teq = eq.rhou(rhot, ut, Xs0, 0)
         assert_array_almost_equal(Xs1, Xst, decimal=4)
         self.assertAlmostEqual(Teq, T, 0)
         return
@@ -56,9 +56,9 @@ class TestCEQ(unittest.TestCase):
         Xs0 = array([1.2680e-3, 0.0, 7.7128e-1, 2.2490e-1, 2.8465e-5, 1.3e-3, 1.0e-3])
         Xs0/=(Xs0.sum())
         Xst = array([1.2680e-3, 0.0, 7.7128e-1, 2.2490e-1, 2.8465e-5, 1.2625e-3, 1.2625e-3])
-        ceq = pyeq.EqCalculator(spnames)
+        eq = eqc.EqCalculator(spnames)
 
-        Mt = sum(Xst*ceq.M)
+        Mt = sum(Xst*eq.M)
         Rt = Ru/Mt
         rhot = p/Rt/T
         nt = 1.0/Mt
@@ -66,11 +66,11 @@ class TestCEQ(unittest.TestCase):
         nst = Xst/Mt # also cs/rhot 
         nt2 = nst.sum()
 
-        s0 = ceq.get_s0(Xst, T)
-        st = ceq.get_s(Xst, T, p)
+        s0 = eq.get_s0(Xst, T)
+        st = eq.get_s(Xst, T, p)
         pt = p
 
-        Xs1, Teq = ceq.ps(pt, st, Xs0, 0)
+        Xs1, Teq = eq.ps(pt, st, Xs0, 0)
         assert_array_almost_equal(Xs1, Xst, decimal=4)
         self.assertAlmostEqual(Teq, T, 0)
 
@@ -80,14 +80,14 @@ class TestCEQ(unittest.TestCase):
         p = 0.1*101.35e3
         Xs0 = array([0.77, 0.0, 0.0, 0.0, 0.23, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         Xs0/=(Xs0.sum())
-        ceq = pyeq.EqCalculator(spnames)
+        eq = eqc.EqCalculator(spnames)
         Xst = array([1.12808714e-03, 1.66990829e-05, 2.62323131e-05, 5.67521824e-05,
                      3.98415990e-07, 1.05942060e-07, 7.27382202e-01, 2.12663187e-02,
                      2.19710628e-01, 4.53634979e-03, 2.58762257e-02])
 
 
-        Xs1 = ceq.pt(p, T, Xs0, 0)
-        print("Ys1: ", ceq.XtoY(Xs1))
+        Xs1 = eq.pt(p, T, Xs0, 0)
+        print("Ys1: ", eq.XtoY(Xs1))
         print("Xs1: ", dict(zip(spnames, Xs1)))
         assert_array_almost_equal(Xs1, Xst, decimal=8)
 

@@ -1,12 +1,12 @@
 """
-Manual test code for ceq
+Manual test code for eq
 
 @author: Nick Gibbons
 """
 import unittest
 from numpy import array, zeros, absolute
 from numpy.testing import assert_array_almost_equal
-import pyeq
+import eqc
 
 class TestCEQ(unittest.TestCase):
     def test_pt(self, verbose=False):
@@ -22,11 +22,11 @@ class TestCEQ(unittest.TestCase):
         Xst[1]=0.0
         Xst[2]=1.0
 
-        ceq = pyeq.EqCalculator(spnames)
-        M = ceq.M
-        a = ceq.a
-        nel = ceq.nel
-        nsp = ceq.nsp
+        eq = eqc.EqCalculator(spnames)
+        M = eq.M
+        a = eq.a
+        nel = eq.nel
+        nsp = eq.nsp
        
         aij = a.reshape(nel,nsp).copy()
         Mmix = sum(Xs0*M)
@@ -36,7 +36,7 @@ class TestCEQ(unittest.TestCase):
 
         verbosity=0
         if verbose: verbosity=1
-        Xs1 = ceq.pt( p, T, Xs0, verbosity)
+        Xs1 = eq.pt( p, T, Xs0, verbosity)
         if verbose:
             print("Name  Init       Computed   Diff")
             for s,k in enumerate(spnames):
