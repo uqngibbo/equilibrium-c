@@ -5,6 +5,6 @@ gcc -I. -fPIC -Wall -std=c99 -O3 -c .\pt.c
 gcc -I. -fPIC -Wall -std=c99 -O3 -c .\rhot.c
 gcc -I. -fPIC -Wall -std=c99 -O3 -c .\rhou.c
 gcc -I. -fPIC -Wall -std=c99 -O3 -c .\ps.c
-gcc -I. -fPIC -Wall -std=c99 -O3 -c .\ceq.c
+gcc -I. -fPIC -Wall -std=c99 -O3 -c .\eqc.c
 
-gcc -I. -fPIC -Wall -std=c99 -O3 -shared .\thermo.o .\linalg.o .\common.o .\pt.o .\rhou.c .\rhot.o .\ps.o .\ceq.o -lm -o .\libceq.dll
+gcc -I. -fPIC -Wall -std=c99 -O3 -shared .\thermo.o .\linalg.o .\common.o .\pt.o .\rhou.c .\rhot.o .\ps.o .\eqc.o -lm -o .\libeqc.dll

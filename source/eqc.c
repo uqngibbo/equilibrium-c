@@ -22,7 +22,7 @@ References:
 #include "rhou.h"
 #include "ps.h"
 #include "rhot.h"
-#include "ceq.h"
+#include "eqc.h"
 
 
 int pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* M,double* a,double* X1, int verbose){
@@ -376,7 +376,7 @@ int batch_u(int N, double* T, double* X, int nsp, double* lewis, double* M, doub
 
 /*
 int main(){
-    printf("Called main in ceq.c!\n");
+    printf("Called main in eqc.c!\n");
     return 0;
 }
 */

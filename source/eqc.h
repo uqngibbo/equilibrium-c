@@ -1,5 +1,5 @@
-#ifndef ceq_h
-#define ceq_h
+#ifndef eqc_h
+#define eqc_h
 
 extern int pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* M,double* a,double* X1,int verbose);
 

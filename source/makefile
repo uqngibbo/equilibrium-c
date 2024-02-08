@@ -1,11 +1,11 @@
 CC = gcc
 CFLAGS := -I. -fPIC -Wall -std=c99 -O3
-INSTALL_DIR ?= $(HOME)/ceqinst
+INSTALL_DIR ?= $(HOME)/eqcinst
 
-all: thermo.o linalg.o common.o pt.o rhou.o ps.o rhot.o ceq.o
-	$(CC) $(CFLAGS) -shared thermo.o linalg.o common.o pt.o rhou.o ps.o rhot.o ceq.o -lm -o libceq.so
-	ar r libceq.a thermo.o linalg.o common.o pt.o rhou.o ps.o rhot.o ceq.o
-	ranlib libceq.a
+all: thermo.o linalg.o common.o pt.o rhou.o ps.o rhot.o eqc.o
+	$(CC) $(CFLAGS) -shared thermo.o linalg.o common.o pt.o rhou.o ps.o rhot.o eqc.o -lm -o libeqc.so
+	ar r libeqc.a thermo.o linalg.o common.o pt.o rhou.o ps.o rhot.o eqc.o
+	ranlib libeqc.a
 
 thermo.o: thermo.c thermo.h
 	$(CC) $(CFLAGS) -c thermo.c
@@ -28,16 +28,16 @@ ps.o: ps.c thermo.h linalg.h common.h ps.h
 rhot.o: rhot.c thermo.h linalg.h common.h rhot.h
 	$(CC) $(CFLAGS) -c rhot.c
 
-ceq.o: ceq.c thermo.h pt.h rhou.h ps.h rhot.h ceq.h
-	$(CC) $(CFLAGS) -c ceq.c
+eqc.o: eqc.c thermo.h pt.h rhou.h ps.h rhot.h eqc.h
+	$(CC) $(CFLAGS) -c eqc.c
 
 install: all
 	mkdir -p $(INSTALL_DIR)
-	cp libceq.so $(INSTALL_DIR)
-	cp 'pyeq.py' $(INSTALL_DIR)
+	cp libeqc.so $(INSTALL_DIR)
+	cp 'eqc.py' $(INSTALL_DIR)
 	cp 'clib.py' $(INSTALL_DIR)
 	cp '../thermo.inp' $(INSTALL_DIR)
-	cp 'ceq.h' $(INSTALL_DIR)
+	cp 'eqc.h' $(INSTALL_DIR)
 	cp -r ../tests $(INSTALL_DIR)/
 
 moduletests: thermo.c thermo.h thermo.o linalg.c linalg.h linalg.o
@@ -46,4 +46,4 @@ moduletests: thermo.c thermo.h thermo.o linalg.c linalg.h linalg.o
 
 clean: 
 	rm -rf *.o *.obj
-	rm -rf libceq.so libceq.a
+	rm -rf libeqc.so libeqc.a

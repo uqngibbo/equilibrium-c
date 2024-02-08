@@ -1,5 +1,5 @@
 """
-Python interface for ceq chemical equilibrium calculator
+Python interface for eqc chemical equilibrium calculator
 
 References:
     "Computer Program for Calculation of Complex Equilibrium Compositions and Applications"
@@ -21,17 +21,17 @@ from clib import *
 
 # Keep these files together. The code will look in the directory
 # where this file is placed for the following:
-DBPATH =     __file__.replace('pyeq.py', 'thermo.inp')
-LIBPATH =    __file__.replace('pyeq.py', 'libceq.so')
-HEADERFILE = __file__.replace('pyeq.py', 'ceq.h')
+DBPATH =     __file__.replace('eqc.py', 'thermo.inp')
+LIBPATH =    __file__.replace('eqc.py', 'libeqc.so')
+HEADERFILE = __file__.replace('eqc.py', 'eqc.h')
 letters = set(ascii_letters)
 
 class EqCalculator(object):
-    """ Python interface to low level ceq routines """
+    """ Python interface to low level eqc routines """
     def __init__(self, spnames):
         self.spnames = spnames
         self.nsp = len(spnames)
-        self.lib = self.load_ceq_library()
+        self.lib = self.load_eqc_library()
 
         atoms = []
         M = []
@@ -148,7 +148,7 @@ class EqCalculator(object):
 
 
     @staticmethod
-    def load_ceq_library(LIBPATH=LIBPATH):
+    def load_eqc_library(LIBPATH=LIBPATH):
         """ Load the c library and set return types """
         lib = CLib(LIBPATH,[HEADERFILE])
         return lib
@@ -271,4 +271,4 @@ class EqCalculator(object):
         return Y
 
 if __name__=='__main__':
-    print("Called pyeq main!")
+    print("Called eqc main!")
