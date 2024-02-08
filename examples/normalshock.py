@@ -9,16 +9,16 @@ v2: With pressure error method.
 from numpy import zeros, array, linspace
 from collections import namedtuple
 from scipy.optimize import newton 
-import pyeq
+import eqc
 
 Ru = 8.314
 class GasState(object):
-    def __init__(self, rho, T, p, u, v, X, ceq):
-        h = ceq.get_h(X, T)
-        s = ceq.get_s(X, T, p)
-        cp= ceq.get_cp(X, T)
-        Ms= ceq.M
-        spnames = ceq.spnames
+    def __init__(self, rho, T, p, u, v, X, eq):
+        h = eq.get_h(X, T)
+        s = eq.get_s(X, T, p)
+        cp= eq.get_cp(X, T)
+        Ms= eq.M
+        spnames = eq.spnames
 
         Mmix = (Ms*X).sum()
         R = Ru/Mmix
@@ -26,7 +26,7 @@ class GasState(object):
         k = cp/cv
         Y = X*Ms/Mmix
 
-        self.T = T; self.p = p; self.u = u; self.v = v; self.X = X; self.ceq = ceq;
+        self.T = T; self.p = p; self.u = u; self.v = v; self.X = X; self.eq = eq;
         self.h = h; self.s = s; self.cp=cp; self.Ms= Ms; self.spnames=spnames;
         self.Mmix = Mmix; self.R = R; self.rho = rho; self.cv=cv; self.k = k; self.Y = Y; self.X0=X;
 
@@ -34,32 +34,32 @@ class GasState(object):
         self.M = self.Mach_number()
 
     @classmethod
-    def from_pTv(cls, p, T, v, X0, ceq):
+    def from_pTv(cls, p, T, v, X0, eq):
         p = max(1.0, p)  # Optimizer sometimes likes to take WILD guesses on these
         T = max(1.0, T)  # which can go negative. This was enough to keep them converging.
         
-        X = ceq.pt(p, T, X0)
-        u = ceq.get_u(X, T)
+        X = eq.pt(p, T, X0)
+        u = eq.get_u(X, T)
 
-        Mmix = (ceq.M*X).sum()
+        Mmix = (eq.M*X).sum()
         R = Ru/Mmix
         rho = p/R/T
 
-        return cls(rho, T, p, u, v, X, ceq)
+        return cls(rho, T, p, u, v, X, eq)
 
     @classmethod
-    def from_rhouv(cls, rho, u, v, X0, ceq):
-        X, T = ceq.rhou(rho, u, X0, 0)
-        Mmix = (ceq.M*X).sum()
+    def from_rhouv(cls, rho, u, v, X0, eq):
+        X, T = eq.rhou(rho, u, X0, 0)
+        Mmix = (eq.M*X).sum()
         R = Ru/Mmix
         p = rho*R*T
-        return cls(rho, T, p, u, v, X, ceq)
+        return cls(rho, T, p, u, v, X, eq)
 
     def new_from_pTv(self, p, T, v):
-        return GasState.from_pTv(p, T, v, X0=self.X0, ceq=self.ceq)
+        return GasState.from_pTv(p, T, v, X0=self.X0, eq=self.eq)
 
     def new_from_rhouv(self, rho, u, v):
-        return GasState.from_rhouv(rho, u, v, X0=self.X0, ceq=self.ceq)
+        return GasState.from_rhouv(rho, u, v, X0=self.X0, eq=self.eq)
 
     def soundspeed(self):
         return (self.k*self.R*self.T)**0.5
@@ -70,8 +70,8 @@ class GasState(object):
 
     def expand_isentropically_to_p(self, p):
         state_ht = self.h + self.v**2/2.0
-        X, T = self.ceq.ps(p, self.s, self.X0)
-        h = self.ceq.get_h(X, T)
+        X, T = self.eq.ps(p, self.s, self.X0)
+        h = self.eq.get_h(X, T)
         if state_ht<h: raise Exception("Thermo Error: Too much expansion requested: p={}".format(p))
 
         v = (2.0*(state_ht - h))**0.5
@@ -86,7 +86,7 @@ class GasState(object):
     
         ht = postshock.h + postshock.v**2/2.0
         sps = postshock.s
-        stagnation_enthalpy_error = lambda p : self.ceq.get_h(*self.ceq.ps(p, sps, postshock.X0)) - ht
+        stagnation_enthalpy_error = lambda p : self.eq.get_h(*self.eq.ps(p, sps, postshock.X0)) - ht
         pstag = newton(stagnation_enthalpy_error, postshock.p*1.2) 
         return pstag
 
@@ -110,7 +110,7 @@ def fluxes(gs):
 def rhopu_from_v(v, preshock):
     Fmass, Fspecies, Fmom, Fenergy = fluxes(preshock)
     #Y0 = array([Fsps/Fmass for Fsps in Fspecies])
-    #X0 = preshock.ceq.YtoX(Y0)
+    #X0 = preshock.eq.YtoX(Y0)
 
     rho = Fmass/v
     p = Fmom - rho*v**2
@@ -219,9 +219,9 @@ if __name__=='__main__':
     X0/=(X0.sum())
     p1=600; T1=300; vi=6000.0
 
-    ceq = pyeq.EqCalculator(spnames)
+    eq = eqc.EqCalculator(spnames)
 
-    preshock = GasState.from_pTv(p=p1, T=T1, v=vi, X0=X0, ceq=ceq)
+    preshock = GasState.from_pTv(p=p1, T=T1, v=vi, X0=X0, eq=eq)
     print("preshock:\n", preshock, '\n')
 
     postshock = normal_shock(preshock)
@@ -231,9 +231,9 @@ if __name__=='__main__':
     print("Ionization fraction: {:g} %".format(ionisation_fraction*100))
 
     Nav = 6.02214076e+23
-    Y = ceq.XtoY(postshock.X)
+    Y = eq.XtoY(postshock.X)
     eidx = spnames.index('e-')
-    Me = ceq.M[eidx]
+    Me = eq.M[eidx]
     rhoe = postshock.rho*Y[eidx]
     ne = rhoe*Nav/Me
     print("Electron Number Density: {:e}".format(ne))
@@ -272,7 +272,7 @@ if __name__=='__main__':
     formatdiff = lambda a,b : "{:<9.1f}  {:<9.1f}  ({:<4.2f} %)".format(a, b, abs(a-b)/a*100)
     eformatdiff = lambda a,b : "{:<8.3e}  {:<8.3e}  ({:<4.2f} %)".format(a, b, abs(a-b)/a*100)
     print("Postshock Gas State:")
-    print("           ceq        CEA        (% diff)")
+    print("           eqc       CEA        (% diff)")
     print("-------------------------------------------")
     print(" v (m/s)|  {}".format(formatdiff(postshock.v, ceadata['U2'])))
     print(" T (K)  |  {}".format(formatdiff(postshock.T, ceadata['T'])))

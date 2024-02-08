@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from matplotlib import colors, cm, rcParams
 from atmo import US76Atmo
 from normalshock import *
-import pyeq
+import eqc
 
 plt.rcParams.update({'font.size': 12})
 plt.rcParams['svg.fonttype'] = 'none'
@@ -21,7 +21,7 @@ plt.rcParams['svg.fonttype'] = 'none'
 spnames = ['N2', 'N2+', 'NO', 'NO+', 'O2', 'O2+', 'N', 'N+', 'O', 'O+', 'e-']
 X0 = array([0.77, 0.0, 0.0, 0.0, 0.23, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 X0/=(X0.sum())
-ceq = pyeq.EqCalculator(spnames)
+eq = eqc.EqCalculator(spnames)
 
 atmo = US76Atmo()
 
@@ -51,15 +51,15 @@ for i in range(ni):
         p0 = rho0*287.0*T0
         M = V/sqrt(1.4*287.0*T0)
 
-        preshock = GasState.from_pTv(p=p0, T=T0, v=V, X0=X0, ceq=ceq)
+        preshock = GasState.from_pTv(p=p0, T=T0, v=V, X0=X0, eq=eq)
         postshock = normal_shock(preshock)
 
         ionisation_fraction = postshock.X[spnames.index('e-')]*2
 
         Nav = 6.02214076e+23
-        Y = ceq.XtoY(postshock.X)
+        Y = eq.XtoY(postshock.X)
         eidx = spnames.index('e-')
-        Me = ceq.M[eidx]
+        Me = eq.M[eidx]
         rhoe = postshock.rho*Y[eidx]
         ne = rhoe*Nav/Me
 

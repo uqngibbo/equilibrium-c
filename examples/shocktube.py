@@ -9,7 +9,7 @@ from collections import namedtuple
 from scipy.optimize import root, newton 
 from copy import copy
 from normalshock import *
-import pyeq
+import eqc
 
 def expand_to_a_ratio(pguess, s6, a_ratio):
     if pguess<1.0: p=10.0
@@ -30,14 +30,14 @@ def stna(p1, T1, vi, Ys1, pe, a_ratio):
     spnames = list(Ys1.keys())
     Y1 = array(list(Ys1.values()))
 
-    ceq = pyeq.EqCalculator(spnames)
+    eq = eqc.EqCalculator(spnames)
 
-    Mmix = (Y1/ceq.M).sum()
+    Mmix = (Y1/eq.M).sum()
     Mmix = Mmix**-1
-    X0 = Y1*Mmix/ceq.M
+    X0 = Y1*Mmix/eq.M
 
     # Shock tube fill condition in incident shock frame (ISF)
-    s1_isf = GasState.from_pTv(p=p1, T=T1, v=vi, X0=X0, ceq=ceq)
+    s1_isf = GasState.from_pTv(p=p1, T=T1, v=vi, X0=X0, eq=eq)
 
     # Compute state 2 in incident shock frame
     s2_isf = normal_shock(s1_isf)
@@ -53,8 +53,8 @@ def stna(p1, T1, vi, Ys1, pe, a_ratio):
     s5.M = 0.0
 
     # Compute relaxed stagnation state
-    s5s_X, s5s_T = ceq.ps(pe, s5.s, X0)
-    s5s = GasState.from_pTv(pe, s5s_T, 0.0, s5s_X, ceq=ceq)
+    s5s_X, s5s_T = eq.ps(pe, s5.s, X0)
+    s5s = GasState.from_pTv(pe, s5s_T, 0.0, s5s_X, eq=eq)
 
     # Compute nozzle throat state
     expand_to_M1 = lambda p : (s5s.expand_isentropically_to_p(p)).M - 1.0
@@ -72,14 +72,14 @@ def stnp(p1, T1, vi, Ys1, pe, pp_on_pe):
     spnames = list(Ys1.keys())
     Y1 = array(list(Ys1.values()))
 
-    ceq = pyeq.EqCalculator(spnames)
+    eq = eqc.EqCalculator(spnames)
 
-    Mmix = (Y1/ceq.M).sum()
+    Mmix = (Y1/eq.M).sum()
     Mmix = Mmix**-1
-    X0 = Y1*Mmix/ceq.M
+    X0 = Y1*Mmix/eq.M
 
     # Shock tube fill condition in incident shock frame (ISF)
-    s1_isf = GasState.from_pTv(p=p1, T=T1, v=vi, X0=X0, ceq=ceq)
+    s1_isf = GasState.from_pTv(p=p1, T=T1, v=vi, X0=X0, eq=eq)
 
     # Compute state 2 in incident shock frame
     s2_isf = normal_shock(s1_isf)
@@ -95,8 +95,8 @@ def stnp(p1, T1, vi, Ys1, pe, pp_on_pe):
     s5.M = 0.0
 
     # Compute relaxed stagnation state
-    s5s_X, s5s_T = ceq.ps(pe, s5.s, X0)
-    s5s = GasState.from_pTv(pe, s5s_T, 0.0, s5s_X, ceq=ceq)
+    s5s_X, s5s_T = eq.ps(pe, s5.s, X0)
+    s5s = GasState.from_pTv(pe, s5s_T, 0.0, s5s_X, eq=eq)
 
     # Compute nozzle throat state
     expand_to_M1 = lambda p : (s5s.expand_isentropically_to_p(p)).M - 1.0

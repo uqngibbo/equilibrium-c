@@ -10,7 +10,7 @@ from numpy import array,exp,cbrt,roots,linspace,zeros,log10
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-import pyeq
+import eqc
 
 # TODO Find the fix for the minus sign issues
 plt.rcParams.update({'font.size': 12})
@@ -80,14 +80,14 @@ for i,p in enumerate(ps):
     pss = Tss*0.0 + p
     Xs0 = zeros((Tss.size, len(spnames)))
     Xs0[:,0] = 1.0
-    ceq = pyeq.EqCalculator(spnames)
-    Xs1 = ceq.batch_pt(pss, Tss, Xs0, 0)
+    eq = eqc.EqCalculator(spnames)
+    Xs1 = eq.batch_pt(pss, Tss, Xs0, 0)
     lines.extend(axes[0].semilogy(Tss, Xs1[:,0], color='black', linewidth=0.5+0.5*i, label="{:3.1f} Atms".format(p/po)))
     axes[1].semilogy(Tss, Xs1[:,1], color='blue', linewidth=0.5+0.5*i)
     axes[2].semilogy(Tss, Xs1[:,2], color='red', linewidth=0.5+0.5*i)
 
 symbols = markers+lines
-make_2D_legend(axes[0], ['Turns', 'ceq'], ['0.1 Atm', '1 Atm', '10 Atm','100 Atm'], symbols)
+make_2D_legend(axes[0], ['Turns', 'eq-c'], ['0.1 Atm', '1 Atm', '10 Atm','100 Atm'], symbols)
 
 axes[0].set_title('CO2')
 axes[1].set_title('CO')

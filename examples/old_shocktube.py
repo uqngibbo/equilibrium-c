@@ -8,21 +8,21 @@ from numpy import zeros, array
 from collections import namedtuple
 from scipy.optimize import root, newton 
 from copy import copy
-import pyeq
+import eqc
 
 Ru = 8.314
 class GasState(object):
-    def __init__(self, p, T, v, X0, ceq):
+    def __init__(self, p, T, v, X0, eq):
         p = max(100.0, p) # Optimizer sometimes likes to take WILD guesses on these
         T = max(20.0, T)  # which can go negative. This was enough to keep them converging.
-        self.p=p; self.T=T; self.v=v; self.X0=X0; self.ceq=ceq
+        self.p=p; self.T=T; self.v=v; self.X0=X0; self.eq=eq
         
-        X = ceq.pt(p, T, X0)
-        h = ceq.get_h(X, T)
-        s = ceq.get_s(X, T, p)
-        cp= ceq.get_cp(X, T)
-        Ms= ceq.M
-        spnames = ceq.spnames
+        X = eq.pt(p, T, X0)
+        h = eq.get_h(X, T)
+        s = eq.get_s(X, T, p)
+        cp= eq.get_cp(X, T)
+        Ms= eq.M
+        spnames = eq.spnames
 
         Mmix = (Ms*X).sum()
         R = Ru/Mmix
@@ -39,7 +39,7 @@ class GasState(object):
         return
 
     def new_from_pTv(self, p, T, v):
-        return GasState(p, T, v, X0=self.X0, ceq=self.ceq)
+        return GasState(p, T, v, X0=self.X0, eq=self.eq)
 
     def soundspeed(self):
         return (self.k*self.R*self.T)**0.5
@@ -50,8 +50,8 @@ class GasState(object):
 
     def expand_isentropically_to_p(self, p):
         state_ht = self.h + self.v**2/2.0
-        X, T = self.ceq.ps(p, self.s, self.X0)
-        h = self.ceq.get_h(X, T)
+        X, T = self.eq.ps(p, self.s, self.X0)
+        h = self.eq.get_h(X, T)
         if state_ht<h: raise Exception("Thermo Error: Too much expansion requested: p={}".format(p))
 
         v = (2.0*(state_ht - h))**0.5
@@ -69,7 +69,7 @@ class GasState(object):
     
         ht = postshock.h + postshock.v**2/2.0
         sps = postshock.s
-        stagnation_enthalpy_error = lambda p : self.ceq.get_h(*self.ceq.ps(p, sps, postshock.X0)) - ht
+        stagnation_enthalpy_error = lambda p : self.eq.get_h(*self.eq.ps(p, sps, postshock.X0)) - ht
         pstag = newton(stagnation_enthalpy_error, postshock.p*1.1) 
         return pstag
 
@@ -121,22 +121,22 @@ def stnp(p1, T1, vi, Ys1, pe, pp_on_pe):
     Y1 = array(list(Ys1.values()))
     print(spnames)
 
-    ceq = pyeq.EqCalculator(spnames)
+    eq = eqc.EqCalculator(spnames)
 
-    Mmix = (Y1/ceq.M).sum()
+    Mmix = (Y1/eq.M).sum()
     Mmix = Mmix**-1
-    X0 = Y1*Mmix/ceq.M
+    X0 = Y1*Mmix/eq.M
     print(X0)
 
     # Shock tube fill condition in incident shock frame (ISF)
-    s1_isf = GasState(p=p1, T=T1, v=vi, X0=X0, ceq=ceq)
+    s1_isf = GasState(p=p1, T=T1, v=vi, X0=X0, eq=eq)
     print("s1\n", s1_isf, '\n')
 
     # Compute state 2 in incident shock frame
     start = guess(s1_isf)
     sinfo = root(F, start, args=(s1_isf,))
     p,T,v = sinfo.x
-    s2_isf = GasState(p=p, T=T, v=v, X0=X0, ceq=ceq)
+    s2_isf = GasState(p=p, T=T, v=v, X0=X0, eq=eq)
     print("s2_isf\n", s2_isf, '\n')
 
     # Transform s2 into lab frame
@@ -151,7 +151,7 @@ def stnp(p1, T1, vi, Ys1, pe, pp_on_pe):
     sinfo = root(F2, start2, args=(s2,))
     p,T,v = sinfo.x
     print("F2 pTv", p,T,v)
-    s5_dash = GasState(p=p, T=T, v=v, X0=X0, ceq=ceq)
+    s5_dash = GasState(p=p, T=T, v=v, X0=X0, eq=eq)
 
     s5 = copy(s5_dash)
     s5.v = 0.0
@@ -159,8 +159,8 @@ def stnp(p1, T1, vi, Ys1, pe, pp_on_pe):
     print("s5\n", s5, '\n')
 
     # Compute relaxed stagnation state
-    s5s_X, s5s_T = ceq.ps(pe, s5.s, X0)
-    s5s = GasState(pe, s5s_T, 0.0, s5s_X, ceq=ceq)
+    s5s_X, s5s_T = eq.ps(pe, s5.s, X0)
+    s5s = GasState(pe, s5s_T, 0.0, s5s_X, eq=eq)
     print("s5s\n", s5s, '\n')
 
     # Compute nozzle throat state

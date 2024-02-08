@@ -7,7 +7,7 @@ Application script: Compute shocktube problem data and compare to exp data.
 import matplotlib.pyplot as plt
 from numpy import pi
 from shocktube import *
-import pyeq
+import eqc
 
 # TODO Find the fix for the minus sign issues
 plt.rcParams.update({'font.size': 12})
@@ -55,8 +55,8 @@ rcfd = linspace(0.0, 100.0)
 ppcfd_0 = 0.0*rcfd + pp_on_pe_0
 ppcfd_6 = 0.0*rcfd + pp_on_pe_6
 axes.errorbar(pp, r, xerr=pp*0.1, marker='.', color='black', linestyle='None', capsize=3, elinewidth=1, markeredgewidth=2,label = 'Shot 11310')
-axes.plot(ppcfd_0, rcfd,'b-', linewidth=3, label="ceq (0mm)")
-axes.plot(ppcfd_6, rcfd,'b--', linewidth=3, label="ceq (6mm)")
+axes.plot(ppcfd_0, rcfd,'b-', linewidth=3, label="eqc (0mm)")
+axes.plot(ppcfd_6, rcfd,'b--', linewidth=3, label="eqc (6mm)")
 axes.fill_betweenx(rcfd, ppcfd_0, ppcfd_6, alpha=0.3, color='blue')
 axes.set_ylabel('Radial Distance from Nozzle Axis (mm)')
 axes.set_xlabel('Pressure \$p_p/p_{stag}\$')
