@@ -1,4 +1,4 @@
-# ceq -- Library for Equilibrium Chemistry Calculations
+# equilibrium-c -- A lightweight, modern library for equilibrium chemistry calculations
 
 - Author: Nick Gibbons (n.gibbons(at)uq.edu.au)
 
@@ -20,7 +20,7 @@
 
 - Build Instructions
 
-    To build and install in '$HOME/ceqinst' type:\
+    To build and install in '$HOME/eqcinst' type:\
     $ cd source\
     $ make all\
     $ make install
@@ -31,7 +31,7 @@
 
 
     Once installed, add the location to your PYTHONPATH in your .bashrc file:\
-    export PYTHONPATH=${PYTHONPATH}:${HOME}/ceqinst
+    export PYTHONPATH=${PYTHONPATH}:${HOME}/eqcinst
 
 
 
@@ -41,13 +41,13 @@
 
 ```python
 from numpy import array
-import pyeq
+import eqc
 
 species = ['CO2', 'CO', 'O2']
-ceq = pyeq.EqCalculator(species)
+eq = eqc.EqCalculator(species)
 
 X0 = array([1.0, 0.0, 0.0])
-X1 = ceq.pt(p=10e3, T=2500.0, Xs0=X0)
+X1 = eq.pt(p=10e3, T=2500.0, Xs0=X0)
 print(X1)
 
 >>> array([ 0.65897178,  0.22735215,  0.11367607])
