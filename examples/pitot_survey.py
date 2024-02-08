@@ -9,6 +9,9 @@ from numpy import pi
 from shocktube import *
 import pyeq
 
+# TODO Find the fix for the minus sign issues
+plt.rcParams.update({'font.size': 12})
+plt.rcParams['svg.fonttype'] = 'none'
 
 # T4 shot 11310 conditions, from M7_pitot_survey, table 1
 Ys1={'N2': 0.767, 'O2': 0.233, 'NO':0.0, 'N':0.0, 'O':0.0, 'NO':0.0}
@@ -43,19 +46,27 @@ with open('t4_11310_pitot_data.csv') as fp:
 
 numbers = [list(map(float,line)) for line in lines]
 r, pp = [array(i) for i in zip(*numbers)]
+r *= 1000.0
 
-fig = plt.figure()
+fig = plt.figure(figsize=(4.5,5))
 axes = fig.gca()
 
-rcfd = linspace(0.0, 0.1)
+rcfd = linspace(0.0, 100.0)
 ppcfd_0 = 0.0*rcfd + pp_on_pe_0
 ppcfd_6 = 0.0*rcfd + pp_on_pe_6
-axes.errorbar(r, pp, yerr=pp*0.1, fmt='k.', capsize=3, elinewidth=1, markeredgewidth=2,label = 'Shot 11310')
-axes.plot(rcfd, ppcfd_0, 'b-', linewidth=2, label="ceq (0mm)")
-axes.plot(rcfd, ppcfd_6, 'r-', linewidth=2, label="ceq (6mm)")
-axes.set_xlabel('Radial Distance from Nozzle Axis (m)')
-axes.set_ylabel('pitot pressure/stagnation pressure')
-axes.set_title('Mach 7 Nozzle Validation')
-axes.legend(framealpha=1.0)
+axes.errorbar(pp, r, xerr=pp*0.1, marker='.', color='black', linestyle='None', capsize=3, elinewidth=1, markeredgewidth=2,label = 'Shot 11310')
+axes.plot(ppcfd_0, rcfd,'b-', linewidth=3, label="ceq (0mm)")
+axes.plot(ppcfd_6, rcfd,'b--', linewidth=3, label="ceq (6mm)")
+axes.fill_betweenx(rcfd, ppcfd_0, ppcfd_6, alpha=0.3, color='blue')
+axes.set_ylabel('Radial Distance from Nozzle Axis (mm)')
+axes.set_xlabel('Pressure \$p_p/p_{stag}\$')
+axes.yaxis.set_label_position("right")
+axes.yaxis.tick_right()
+#axes.set_title('Mach 7 Nozzle Validation')
+axes.spines['top'].set_visible(False)
+axes.spines['left'].set_visible(False)
+axes.legend(framealpha=1.0, loc='lower left')
+plt.tight_layout()
 plt.grid()
+plt.savefig('t4_11310_results.svg')
 plt.show()
