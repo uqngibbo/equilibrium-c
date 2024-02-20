@@ -36,9 +36,12 @@ install: all
 	cp libeqc.so $(INSTALL_DIR)
 	cp 'eqc.py' $(INSTALL_DIR)
 	cp 'clib.py' $(INSTALL_DIR)
-	cp '../thermo.inp' $(INSTALL_DIR)
+	cp 'thermo.inp' $(INSTALL_DIR)
 	cp 'eqc.h' $(INSTALL_DIR)
 	cp -r ../tests $(INSTALL_DIR)/
+
+tests:
+	PYTHONPATH=$(shell pwd) pytest-3 ../tests
 
 moduletests: thermo.c thermo.h thermo.o linalg.c linalg.h linalg.o
 	$(CC) thermo.c -D TEST -lm -o ../tests/testthermo
@@ -47,3 +50,4 @@ moduletests: thermo.c thermo.h thermo.o linalg.c linalg.h linalg.o
 clean: 
 	rm -rf *.o *.obj
 	rm -rf libeqc.so libeqc.a
+	rm -rf __pycache__
