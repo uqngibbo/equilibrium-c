@@ -8,7 +8,7 @@ import unittest
 from numpy import array, zeros, absolute
 from numpy.testing import assert_array_almost_equal
 import eqc
-from os import system 
+from os import system, path
 from re import search,split
 
 def get_cea_test(p,T,spnames):
@@ -18,7 +18,10 @@ def get_cea_test(p,T,spnames):
     #with open('ceatests/co2.inp','w') as fp: fp.write(text)
 
     #system('cea2 ceatests/co2') 
-    with open('ceatests/co2.out') as fp: text=fp.read()
+
+    filepath = path.dirname(__file__)
+    cea_results = path.join(filepath, 'ceatests/co2.out')
+    with open(cea_results) as fp: text=fp.read()
 
     regexstring = r'MOLE FRACTIONS\n\n( [\*]*[\S]+[\s]+[\s\.\d-]+\n)+\n'
     match = search(regexstring,text)
