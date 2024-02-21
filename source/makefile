@@ -40,7 +40,7 @@ install: all
 	cp 'eqc.h' $(INSTALL_DIR)
 	cp -r ../tests $(INSTALL_DIR)/
 
-tests:
+test:
 	PYTHONPATH=$(shell pwd) pytest-3 ../tests
 
 moduletests: thermo.c thermo.h thermo.o linalg.c linalg.h linalg.o
