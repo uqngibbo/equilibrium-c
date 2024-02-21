@@ -34,4 +34,4 @@ jobs:
     - name: Test with pytest
       run: |
         cd source
-        make test
+        PYTHONPATH=$(pwd) pytest ../tests
