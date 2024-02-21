@@ -33,4 +33,5 @@ jobs:
         make
     - name: Test with pytest
       run: |
+        cd source
         make test
