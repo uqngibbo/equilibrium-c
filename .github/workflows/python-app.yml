@@ -29,6 +29,7 @@ jobs:
         pip install pytest numpy
     - name: Build
       run: |
+        cd source
         make
     - name: Test with pytest
       run: |
