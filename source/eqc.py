@@ -261,12 +261,12 @@ class EqCalculator(object):
         return u
 
     def YtoX(self, Y):
-        Mmix = 1.0/((Y/self.M).sum())
+        Mmix = 1.0/((Y/self.M).sum(axis=-1))
         X = Y*Mmix/self.M
         return X
     
     def XtoY(self, X):
-        Mmix = (X*self.M).sum()
+        Mmix = (X*self.M).sum(axis=-1)
         Y = X*self.M/Mmix
         return Y
 
