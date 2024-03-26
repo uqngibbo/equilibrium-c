@@ -10,7 +10,7 @@ C library for equilibrium chemistry calculations
 #include <stdlib.h>
 
 const double TRACELIMIT=1e-8;   // Trace species limiter (for ns/n)
-const double tol=1e-10;
+const double tol=1e-8;
 const int attempts=50;
 
 double update_limit_factor(double x, double dx, double fac){
@@ -99,9 +99,8 @@ void composition_guess(double* a,double* M,double* X0,int nsp,int nel,double* ns
         bi0[i] = 0.0;
         for (s=0; s<nsp; s++){
             bi0[i] += a[i*nsp + s]*X0[s]/M0;
-            }
+        }
     }
-
 
     n = 0.0;
     for (s=0; s<nsp; s++) n += ns[s];
