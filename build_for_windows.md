@@ -18,24 +18,24 @@
 
     Once the code has been built, you will need to add the source directory to your Path and Pythonpath. This can be accomplished as follows:
 
-    1. Open the Start menu and search for "Environment Variables."
+    1.  Open the Start menu and search for "Environment Variables."
     
-    2. Click on "Edit the system environment variables."
+    2.  Click on "Edit the system environment variables."
     
-    3. In the System Properties window, click on the "Environment Variables" button.
+    3.  In the System Properties window, click on the "Environment Variables" button.
     
-    4. Under "System variables," scroll down and find the "Path" variable.
+    4.  Under "System variables," scroll down and find the "Path" variable.
     
-    5. Select the "Path" variable and click on the "Edit" button.
+    5.  Select the "Path" variable and click on the "Edit" button.
     
-    6. Click on the "New" button and enter the path to the directory that you want to add.
+    6.  Click on the "New" button and enter the path to the directory that you want to add.
     
-    7. Click on the "OK" button to close the Edit Environment Variable window.
+    7.  Click on the "OK" button to close the Edit Environment Variable window.
     
-    8. Under "System variables," scroll down and find the "PYTHONPATH" variable. If the "PYTHONPATH" variable does not exist, you will need to create it by clicking on the "New" button and entering a name of
-    "PYTHONPATH" and a value of the directory that you want to add.
+    8.  Under "System variables," scroll down and find the "PYTHONPATH" variable. If the "PYTHONPATH" variable does not exist, you will need to create it by clicking on the "New" button and entering a name of
+    YTHONPATH" and a value of the directory that you want to add.
     
-    9. Select the "PYTHONPATH" variable and click on the "Edit" button.
+    9.  Select the "PYTHONPATH" variable and click on the "Edit" button.
     
     10. Click on the "New" button and enter the path to the directory that you want to add.
     
