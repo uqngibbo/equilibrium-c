@@ -17,13 +17,16 @@ References:
 from string import ascii_letters
 from numpy import array, zeros, log
 from ctypes import cdll,c_double,POINTER,c_int,byref
+from platform import system
 from clib import *
 
 # Keep these files together. The code will look in the directory
 # where this file is placed for the following:
 DBPATH =     __file__.replace('eqc.py', 'thermo.inp')
-LIBPATH =    __file__.replace('eqc.py', 'libeqc.so')
 HEADERFILE = __file__.replace('eqc.py', 'eqc.h')
+if system()=='Linux':     LIBPATH = __file__.replace('eqc.py', 'libeqc.so')
+elif system()=='Windows': LIBPATH = __file__.replace('eqc.py', 'libeqc.dll')
+else: raise Exception("Failed to find a supported correct OS, should be Linux or Windows.")
 letters = set(ascii_letters)
 
 class EqCalculator(object):
