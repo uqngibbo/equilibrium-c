@@ -18,7 +18,7 @@
     + python3-numpy
     + gcc
 
-- Build Instructions
+- Build Instructions (Linux)
 
     To build and install in '$HOME/eqcinst' type:\
     $ cd source\
@@ -33,6 +33,9 @@
     Once installed, add the location to your PYTHONPATH in your .bashrc file:\
     export PYTHONPATH=${PYTHONPATH}:${HOME}/eqcinst
 
+- Build Instructions (Windows)
+
+    Please click [here](./build_for_windows.md)
 
 
 - Use Instructions
