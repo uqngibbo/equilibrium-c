@@ -52,19 +52,22 @@ fig = plt.figure(figsize=(4.5,5))
 axes = fig.gca()
 
 rcfd = linspace(0.0, 100.0)
+
 ppcfd_0 = 0.0*rcfd + pp_on_pe_0
 ppcfd_6 = 0.0*rcfd + pp_on_pe_6
+
 axes.errorbar(pp, r, xerr=pp*0.1, marker='.', color='black', linestyle='None', capsize=3, elinewidth=1, markeredgewidth=2,label = 'Shot 11310')
 axes.plot(ppcfd_0, rcfd,'b-', linewidth=3, label="eqc (0mm)")
 axes.plot(ppcfd_6, rcfd,'b--', linewidth=3, label="eqc (6mm)")
 axes.fill_betweenx(rcfd, ppcfd_0, ppcfd_6, alpha=0.3, color='blue')
+
 axes.set_ylabel('Radial Distance from Nozzle Axis (mm)')
-axes.set_xlabel('Pressure \$p_p/p_{stag}\$')
-axes.yaxis.set_label_position("right")
-axes.yaxis.tick_right()
+axes.set_xlabel('Pressure \$p_7/p_5\$')
+#axes.yaxis.set_label_position("right")
+#axes.yaxis.tick_right()
 #axes.set_title('Mach 7 Nozzle Validation')
 axes.spines['top'].set_visible(False)
-axes.spines['left'].set_visible(False)
+axes.spines['right'].set_visible(False)
 axes.legend(framealpha=1.0, loc='lower left')
 plt.tight_layout()
 plt.grid()
