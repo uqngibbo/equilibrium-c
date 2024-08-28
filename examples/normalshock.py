@@ -90,6 +90,13 @@ class GasState(object):
         pstag = newton(stagnation_enthalpy_error, postshock.p*1.2) 
         return pstag
 
+    def total_pressure(self):
+        ht = self.h + self.v**2/2.0
+        sps = self.s
+        stagnation_enthalpy_error = lambda p : self.eq.get_h(*self.eq.ps(p, sps, self.X0)) - ht
+        ptotal= newton(stagnation_enthalpy_error, self.p*1.2) 
+        return ptotal
+
     def __repr__(self):
         s = [
         'p: {:12.3f} Pa  T: {:8.3f} K  rho: {:6.3f} kg/m3  v: {:8.3f} m/s'.format(self.p, self.T, self.rho, self.v),
