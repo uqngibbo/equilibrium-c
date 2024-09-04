@@ -9,9 +9,10 @@ C library for equilibrium chemistry calculations
 #include <math.h>
 #include <stdlib.h>
 
-const double TRACELIMIT=1e-8;   // Trace species limiter (for ns/n)
-const double tol=1e-8;
+const double TRACELIMIT=1e-99;   // Trace species limiter (for ns/n)
+const double tol=1e-11;
 const int attempts=50;
+const double relaxation_limit = 0.75;
 
 double update_limit_factor(double x, double dx, double fac){
     /*
@@ -104,7 +105,7 @@ void composition_guess(double* a,double* M,double* X0,int nsp,int nel,double* ns
 
     n = 0.0;
     for (s=0; s<nsp; s++) n += ns[s];
-    for (s=0; s<nsp; s++) ns[s] = fmax(ns[s], n*TRACELIMIT*100.0);
+    for (s=0; s<nsp; s++) ns[s] = fmax(ns[s], n*1e-4);
     *np = n;
 
     // Auto lock species with missing elements

@@ -86,6 +86,69 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
     return;
 }
 
+static double compute_residual(double* pij, double* a, double* G0_RTs, double p, double T, double n,
+                               double* ns, double* bi0, int nsp, int nel, int verbose){
+    /*
+    Compute the L2 of the PT Lagrangian derivatives. Note as per the paper, we actually compute
+    ns[s] times equation (44). This ensures that the equations are nonsingular for ns[s] -> 0.0
+    but still have the same root as the original equations.
+
+    Inputs:
+        pij    : Corrections (dlog(n), pi1, pi2, pi3 ...)  [nel+1]
+        a      : elemental composition array [nel,nsp]
+        G0_RTs : Gibbs free energy of each species, divided by RT [nsp]
+        p      : pressure  (Pa)
+        T      : Temperature (K)
+        n      : total moles/mixture kg
+        ns     : species moles/mixture kg [nsp]
+        nsp    : total number of species
+        nel    : total number of elements
+
+    Outputs:
+        double : L2 norm of the residual of the nonlinear equations being solved.
+    */
+
+    double residual = 0.0;
+
+    for (int s=0; s<nsp; s++){
+        // ns*log(ns) is badly behaved at ns==0.0, but should be fine at any other nonnegative number
+        double nss = ns[s];
+        double nslogns;
+        if (nss==0.0) { nslogns=0.0; } else { nslogns = nss*log(nss); }
+
+        // Equation ?? from the eqc paper
+        double Rs = nss*G0_RTs[s] + nslogns - nss*log(n) + nss*log(p/1e5);
+        double pijj = 0.0;
+        for (int j=0; j<nel; j++){
+            pijj += pij[1+j]*a[j*nsp + s];
+        }
+        Rs -= nss*pijj;
+        if (verbose>1) printf("ns*Rss[%d]=%e\n", s, Rs);
+        residual += Rs*Rs;
+    }
+
+    // Equation ?? from the eqc paper
+    for (int j=0; j<nel; j++){
+        double Rs = 0.0;
+        for (int s=0; s<nsp; s++){
+            Rs += a[j*nsp + s]*ns[s];
+        }
+        Rs -= bi0[j];
+        if (verbose>1) printf("Rse[%d]=%e\n", j, Rs);
+        residual += Rs*Rs;
+    }
+
+    // Equation ?? from the eqc paper
+    double Rs = n;
+    for (int s=0; s<nsp; s++){
+        Rs -= ns[s];
+    }
+    if (verbose>1) printf("Rsn=%e\n", Rs);
+    residual += Rs*Rs;
+
+    return sqrt(residual);
+}
+
 static void species_corrections(double* S,double* a,double* G0_RTs,double p,double n,double* ns,
                         int nsp, int nel, double* dlnns, int verbose){
     /*
@@ -170,7 +233,7 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
     const char pstring[] = "  s: %d lnns: % f rdlnns: % f dlnns: %f TR: % e lambda: % f\n"; 
 
     lnn = log(*n); // compute the log of the thing n is pointing to
-    lambda = update_limit_factor(lnn, S[0], 0.5);
+    lambda = update_limit_factor(lnn, S[0], relaxation_limit);
     n_copy = exp(lnn + lambda*S[0]); 
     *n = n_copy;   // thing pointed to by n set to exp(lnn + S[0]);
 
@@ -181,7 +244,7 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
             continue;
         }
         lnns = log(ns[s]);
-        lambda = update_limit_factor(lnn, dlnns[s], 0.5);
+        lambda = update_limit_factor(lnn, dlnns[s], relaxation_limit);
         newns = exp(lnns + lambda*dlnns[s]);
         rdlnns = log(newns) - lnns;
         ns[s] = newns;
@@ -246,7 +309,7 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         species_corrections(S, a, G0_RTs, p, n, ns, nsp, nel, dlnns, verbose);
         update_unknowns(S, dlnns, nsp, nel, ns, &n, verbose);
         handle_trace_species_locking(a, n, nsp, nel, ns, bi0, dlnns, verbose);
-        errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, neq, dlnns);
+        errorrms = compute_residual(S, a, G0_RTs, p, T, n, ns, bi0, nsp, nel, verbose);
 
         if (verbose>0){
             printf("iter %2d: [%f]",k,n);
