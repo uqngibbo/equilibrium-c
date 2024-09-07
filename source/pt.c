@@ -53,7 +53,8 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
             akjnjmuj += a[k*nsp+j]*ns[j]*mus_RTj;
 
         }
-        B[k] = bi0[k] - bk + akjnjmuj;
+        //B[k] = bi0[k] - bk + akjnjmuj;// CEA equations
+        B[k] = bi0[k] + akjnjmuj;       // Newcode vers
         check_ill_posed_matrix_row(A, B, neq, k, 1);
     }
 
@@ -73,7 +74,8 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
         nsmus += ns[j]*mus_RTj;
     }
     A[nel*neq + 0]  = nss - n;
-    B[nel] = n - nss + nsmus;
+    //B[nel] = n - nss + nsmus;  // CEA equations
+    B[nel] = n + nsmus;          // Newcode vers
     
     //for (i=0; i<neq; i++){
     //    printf("    [");
@@ -117,7 +119,8 @@ static double compute_residual(double* pij, double* a, double* G0_RTs, double p,
         if (nss==0.0) { nslogns=0.0; } else { nslogns = nss*log(nss); }
 
         // Equation ?? from the eqc paper
-        double Rs = nss*G0_RTs[s] + nslogns - nss*log(n) + nss*log(p/1e5);
+        //double Rs = nss*G0_RTs[s] + nslogns - nss*log(n) + nss*log(p/1e5);         // CEA equations
+        double Rs = nss*G0_RTs[s] + nslogns - nss*log(n) + nss*log(p/1e5) + 1.0*nss; // Newcode vers
         double pijj = 0.0;
         for (int j=0; j<nel; j++){
             pijj += pij[1+j]*a[j*nsp + s];
@@ -147,6 +150,29 @@ static double compute_residual(double* pij, double* a, double* G0_RTs, double p,
     residual += Rs*Rs;
 
     return sqrt(residual);
+}
+
+static double compute_lagrangian(double* pij, double* a, double* G0_RTs, double p, double T, double n,
+                                 double* ns, double* bi0, int nsp, int nel, int verbose){
+
+    double L = 0.0;
+
+    for (int s=0; s<nsp; s++){
+        // ns*log(ns) is badly behaved at ns==0.0, but should be fine at any other nonnegative number
+        double nss = ns[s];
+        double nslogns;
+        if (nss==0.0) { nslogns=0.0; } else { nslogns = nss*log(nss); }
+
+        L += Ru*T*(nss*G0_RTs[s] + nslogns - nss*log(n) + nss*log(p/1e5));
+    }
+
+    for (int j=0; j<nel; j++){
+        double ajsns = 0.0; for (int s=0; s<nsp; s++) ajsns += a[j*nsp + s]*ns[s];
+        double lambda_j = -1.0*Ru*T*pij[j+1];
+        L += lambda_j*(ajsns - bi0[j]);
+    }
+
+    return L;
 }
 
 static void species_corrections(double* S,double* a,double* G0_RTs,double p,double n,double* ns,
@@ -181,7 +207,8 @@ static void species_corrections(double* S,double* a,double* G0_RTs,double p,doub
         for (i=0; i<nel; i++){
             aispii += a[i*nsp+s]*S[i+1]; // S[i+1] = pi_i, the lagrange multiplier
         }
-        dlnns[s] = -mu_RTs + dlnn + aispii;
+        //dlnns[s] = -mu_RTs + dlnn + aispii;     // CEA equations
+        dlnns[s] = -mu_RTs + dlnn + aispii - 1.0; // Newcode vers
         //printf("    dlnns[%d] = %f (%f %f %f)\n", s, dlnns[s], -mu_RTs, dlnn, aispii);
     }
     return; 
@@ -311,11 +338,13 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         handle_trace_species_locking(a, n, nsp, nel, ns, bi0, dlnns, verbose);
         errorrms = compute_residual(S, a, G0_RTs, p, T, n, ns, bi0, nsp, nel, verbose);
 
+
         if (verbose>0){
             printf("iter %2d: [%f]",k,n);
             for (s=0; s<nsp; s++) printf(" %f",ns[s]);
             printf("  (%e)\n", errorrms);
         }
+
 
         // Exit loop if all but one species are trace 
         i = all_but_one_species_are_trace(nsp, ns);
@@ -347,6 +376,24 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     
     if ((verbose>0)&&(errorcode==0)) printf("Converged in %d iter, error: %e\n", k, errorrms);
     if ((verbose>0)&&(errorcode>0)) printf("Convergence failure in %d iter, error: %e\n", k, errorrms);
+
+    // For verification purposes, we might want to numerically differentiate the
+    // Lagrangian to check that we have correctly found the actual stationary point.
+    if (verbose>0){
+        double eps = 1e-7;
+        double L = compute_lagrangian(S, a, G0_RTs, p, T, n, ns, bi0, nsp, nel, verbose);
+        printf("Lagrangian:[%e]\n   ",L);
+        for (s=0; s<nsp; s++) {
+            double ns_save = ns[s];
+            double perturb = ns[s]*eps;
+            ns[s] += perturb;
+            double L2 = compute_lagrangian(S, a, G0_RTs, p, T, n, ns, bi0, nsp, nel, verbose);
+            ns[s] = ns_save;
+            double dLdns = (L2-L)/perturb;
+            printf(" dLdn[%d]= %e",s, dLdns);
+        }
+        printf("\n");
+    }
     // Compute output composition
     M1 = 1.0/n;
     for (s=0; s<nsp; s++) X1[s] = M1*ns[s];

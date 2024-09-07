@@ -12,7 +12,7 @@ p = 0.1*101.35e3
 Xs0 = array([0.767, 0.233, 0.0, 0.0, 0.0])
 
 eq = eqc.EqCalculator(spnames)
-Xs1 = eq.pt(p, T, Xs0, 0)
+Xs1 = eq.pt(p, T, Xs0, 1)
 
 Xst = array([7.4785e-1, 2.0900e-1, 7.9320e-7, 2.0799e-2, 2.2349e-2])
 Ys0 = eq.XtoY(Xs0)
