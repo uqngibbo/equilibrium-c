@@ -16,8 +16,10 @@ class TestCEQ(unittest.TestCase):
         T = 2500.0
         p = 0.1*101.35e3
         Xs0 = array([1.0, 0.0, 0.0])
-        Xst = array([0.66010397,  0.22659735,  0.11329868])
         #Xst = array([0.66108962603325838,0.22594024931116111,0.11297012465558055])
+        #Xst = array([0.66010397,  0.22659735,  0.11329868]) # Old code with CEA mistake
+        Xst = array([0.73771891,   0.17485406,  0.08742703])
+
         eq = eqc.EqCalculator(spnames)
 
         Xs1 = eq.pt(p, T, Xs0, 0)
