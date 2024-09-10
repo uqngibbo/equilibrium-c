@@ -374,6 +374,26 @@ int batch_u(int N, double* T, double* X, int nsp, double* lewis, double* M, doub
     return 0;
 }
 
+int verify_equilibrium(double p,double T,double* X0,int nsp,int nel,double* lewis,double* M,double* a,double* dLdn, int verbose){
+    /*
+    Compute the equilibrium composition X1 at a fixed temperature and pressure
+    Inputs:
+        p     : Pressure (Pa)
+        T     : Temperature (K)
+        X0    : Intial Mole fractions [nsp]
+        nsp   : number of species
+        nel   : number of elements
+        lewis : Nasa Lewis Thermodynamic Database Data [nsp*3*9]
+        M     : Molar Mass of each species (kg/mol) [nsp]
+        a     : elemental composition array [nel,nsp]
+        verbose: print debugging information
+
+    Output:
+        dLdn : Partial derivatives of the Lagrangian [nsp]
+    */
+    return verify_equilibrium_pt(p, T, X0, nsp, nel, lewis, M, a, dLdn, verbose);
+}
+
 /*
 int main(){
     printf("Called main in eqc.c!\n");

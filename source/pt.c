@@ -152,7 +152,7 @@ static double compute_residual(double* pij, double* a, double* G0_RTs, double p,
     return sqrt(residual);
 }
 
-static double compute_lagrangian(double* pij, double* a, double* G0_RTs, double p, double T, double n,
+static double lagrangian(double* S, double* a, double* G0_RTs, double p, double T, double n,
                                  double* ns, double* bi0, int nsp, int nel, int verbose){
 
     double L = 0.0;
@@ -168,11 +168,35 @@ static double compute_lagrangian(double* pij, double* a, double* G0_RTs, double 
 
     for (int j=0; j<nel; j++){
         double ajsns = 0.0; for (int s=0; s<nsp; s++) ajsns += a[j*nsp + s]*ns[s];
-        double lambda_j = -1.0*Ru*T*pij[j+1];
+        double lambda_j = -1.0*Ru*T*S[j+1];
         L += lambda_j*(ajsns - bi0[j]);
     }
 
     return L;
+}
+
+static void compute_lagrangian_derivatives(double* S, double* a, double* G0_RTs, double p, double T, double n,
+                                 double* ns, double* bi0, int nsp, int nel, double* dLdn, int verbose){
+    // For verification purposes, we want to numerically differentiate the
+    // Lagrangian to check that we have correctly found the actual stationary point.
+    double eps = 1e-7;
+    double L = lagrangian(S, a, G0_RTs, p, T, n, ns, bi0, nsp, nel, verbose);
+    if (verbose>1) printf("Lagrangian:[%e]\n   ",L);
+
+    for (int s=0; s<nsp; s++) {
+        double ns_save = ns[s];
+        double perturb = ns[s]*eps;
+
+        ns[s] += perturb;
+        double L2 = lagrangian(S, a, G0_RTs, p, T, n, ns, bi0, nsp, nel, verbose);
+        ns[s] = ns_save;
+
+        double dLdns = (L2-L)/perturb;
+        if (verbose>1) printf(" dLdn[%d]= %e",s, dLdns);
+        dLdn[s] = dLdns;
+    }
+    if (verbose>1) printf("\n");
+    return;
 }
 
 static void species_corrections(double* S,double* a,double* G0_RTs,double p,double n,double* ns,
@@ -283,7 +307,7 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
     return;
 }
 
-int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* M,double* a,double* X1,int verbose){
+int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* M,double* a,double* X1, int verbose){
     /*
     Compute the equilibrium composition X1 at a fixed temperature and pressure
     Inputs:
@@ -298,7 +322,7 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
         verbose: print debugging information
 
     Output:
-        X1 : Equilibrium Mole Fraction [nsp]  
+        X1    : Equilibrium Mole Fraction [nsp]
     */
     double *A, *B, *S, *G0_RTs, *ns, *bi0, *dlnns; // Dynamic arrays
     double *lp;
@@ -377,23 +401,6 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     if ((verbose>0)&&(errorcode==0)) printf("Converged in %d iter, error: %e\n", k, errorrms);
     if ((verbose>0)&&(errorcode>0)) printf("Convergence failure in %d iter, error: %e\n", k, errorrms);
 
-    // For verification purposes, we might want to numerically differentiate the
-    // Lagrangian to check that we have correctly found the actual stationary point.
-    if (verbose>0){
-        double eps = 1e-7;
-        double L = compute_lagrangian(S, a, G0_RTs, p, T, n, ns, bi0, nsp, nel, verbose);
-        printf("Lagrangian:[%e]\n   ",L);
-        for (s=0; s<nsp; s++) {
-            double ns_save = ns[s];
-            double perturb = ns[s]*eps;
-            ns[s] += perturb;
-            double L2 = compute_lagrangian(S, a, G0_RTs, p, T, n, ns, bi0, nsp, nel, verbose);
-            ns[s] = ns_save;
-            double dLdns = (L2-L)/perturb;
-            printf(" dLdn[%d]= %e",s, dLdns);
-        }
-        printf("\n");
-    }
     // Compute output composition
     M1 = 1.0/n;
     for (s=0; s<nsp; s++) X1[s] = M1*ns[s];
@@ -405,6 +412,71 @@ int solve_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* 
     free(ns);
     free(bi0);
     free(dlnns);
+    return errorcode;
+}
+
+int verify_equilibrium_pt(double p,double T,double* X0,int nsp,int nel,double* lewis,double* M,double* a, double* dLdn, int verbose){
+    /*
+    Compute the equilibrium composition X1 at a fixed temperature and pressure
+    Inputs:
+        p     : Pressure (Pa)
+        T     : Temperature (K)
+        X0    : Intial Mole fractions [nsp]
+        nsp   : number of species
+        nel   : number of elements
+        lewis : Nasa Lewis Thermodynamic Database Data [nsp*3*9]
+        M     : Molar Mass of each species (kg/mol) [nsp]
+        a     : elemental composition array [nel,nsp]
+        verbose: print debugging information
+
+    Output:
+        dLdn : Derivatives of the final Lagrangian [nsp]
+    */
+    double *A, *B, *S, *G0_RTs, *ns, *bi0; // Dynamic arrays
+    double *lp;
+    int neq,s,i,errorcode;
+    double n,M0;
+
+    errorcode=0;
+    neq= nel+1;
+    A     = (double*) malloc(sizeof(double)*neq*neq); // Iteration Jacobian
+    B     = (double*) malloc(sizeof(double)*neq);     // Iteration RHS
+    S     = (double*) malloc(sizeof(double)*neq);     // Iteration unknown vector
+    G0_RTs= (double*) malloc(sizeof(double)*nsp);     // Species Gibbs Free Energy
+    ns    = (double*) malloc(sizeof(double)*nsp);     // Species moles/mixture mass
+    bi0   = (double*) malloc(sizeof(double)*nel);     // starting composition coefficients
+
+    M0 = 0.0;
+    for (s=0; s<nsp; s++) M0 += M[s]*X0[s];
+    for (s=0; s<nsp; s++) ns[s] = X0[s]/M0;
+
+    for (i=0; i<nel; i++){
+        bi0[i] = 0.0;
+        for (s=0; s<nsp; s++){
+            bi0[i] += a[i*nsp + s]*X0[s]/M0;
+        }
+    }
+
+    n = 0.0;
+    for (s=0; s<nsp; s++) n += ns[s];
+
+    for (s=0; s<nsp; s++){
+        lp = lewis + 9*3*s;
+        G0_RTs[s] = compute_G0_RT(T, lp);
+    }
+
+    // 1: Perform an update of the equations to get the lagrange multipliers
+    Assemble_Matrices(a, bi0, G0_RTs, p, ns, n, nsp, nel, A, B);
+    errorcode = solve_matrix(A, B, S, neq);
+
+    compute_lagrangian_derivatives(S, a, G0_RTs, p, T, n, ns, bi0, nsp, nel, dLdn, verbose);
+
+    free(A);
+    free(B);
+    free(S);
+    free(G0_RTs);
+    free(ns);
+    free(bi0);
     return errorcode;
 }
 

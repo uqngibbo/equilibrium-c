@@ -25,4 +25,6 @@ extern int batch_rhou(int N, double* rho,double* u,double* X0,int nsp,int nel,do
 
 extern int batch_u(int N, double* T, double* X, int nsp, double* lewis, double* M, double* u);
 
+extern int verify_equilibrium(double p,double T,double* X0,int nsp,int nel,double* lewis,double* M,double* a,double* dLdn, int verbose);
+
 #endif

@@ -263,6 +263,15 @@ class EqCalculator(object):
         if recode!=0: raise Exception("u calc failed.")
         return u
 
+    def verify_equilibrium(self, p, T, Xs0, verbose=0):
+        """ Call c library to compute lagrangian derivatives for fixed p, T """
+        if Xs0.size!=self.nsp: raise Exception('Mismatched array size {}!={}'.format(Xs0.size, self.nsp))
+        dLdn = zeros(Xs0.shape)
+
+        recode = self.lib.verify_equilibrium(p, T, Xs0, self.nsp, self.nel, self.lewis, self.M, self.a, dLdn, verbose)
+        if recode!=0: raise Exception("Equilibrium Verify Failed.")
+        return dLdn
+
     def YtoX(self, Y):
         Mmix = 1.0/((Y/self.M).sum(axis=-1))
         X = Y*Mmix/self.M
