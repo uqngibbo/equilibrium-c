@@ -53,8 +53,7 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
             akjnjmuj += a[k*nsp+j]*ns[j]*mus_RTj;
 
         }
-        //B[k] = bi0[k] - bk + akjnjmuj;// CEA equations
-        B[k] = bi0[k] + akjnjmuj;       // Newcode vers
+        B[k] = bi0[k] - bk + akjnjmuj;// CEA equations
         check_ill_posed_matrix_row(A, B, neq, k, 1);
     }
 
@@ -74,8 +73,7 @@ static void Assemble_Matrices(double* a,double* bi0,double* G0_RTs,double p,doub
         nsmus += ns[j]*mus_RTj;
     }
     A[nel*neq + 0]  = nss - n;
-    //B[nel] = n - nss + nsmus;  // CEA equations
-    B[nel] = n + nsmus;          // Newcode vers
+    B[nel] = n - nss + nsmus;  // CEA equations
     
     //for (i=0; i<neq; i++){
     //    printf("    [");
@@ -119,8 +117,7 @@ static double compute_residual(double* pij, double* a, double* G0_RTs, double p,
         if (nss==0.0) { nslogns=0.0; } else { nslogns = nss*log(nss); }
 
         // Equation ?? from the eqc paper
-        //double Rs = nss*G0_RTs[s] + nslogns - nss*log(n) + nss*log(p/1e5);         // CEA equations
-        double Rs = nss*G0_RTs[s] + nslogns - nss*log(n) + nss*log(p/1e5) + 1.0*nss; // Newcode vers
+        double Rs = nss*G0_RTs[s] + nslogns - nss*log(n) + nss*log(p/1e5);         // CEA equations
         double pijj = 0.0;
         for (int j=0; j<nel; j++){
             pijj += pij[1+j]*a[j*nsp + s];
@@ -152,10 +149,12 @@ static double compute_residual(double* pij, double* a, double* G0_RTs, double p,
     return sqrt(residual);
 }
 
-static double lagrangian(double* S, double* a, double* G0_RTs, double p, double T, double n,
+static double lagrangian(double* S, double* a, double* G0_RTs, double p, double T,
                                  double* ns, double* bi0, int nsp, int nel, int verbose){
 
     double L = 0.0;
+    double nn = 0.0;
+    for (int s=0; s<nsp; s++) nn += ns[s];
 
     for (int s=0; s<nsp; s++){
         // ns*log(ns) is badly behaved at ns==0.0, but should be fine at any other nonnegative number
@@ -163,7 +162,7 @@ static double lagrangian(double* S, double* a, double* G0_RTs, double p, double 
         double nslogns;
         if (nss==0.0) { nslogns=0.0; } else { nslogns = nss*log(nss); }
 
-        L += Ru*T*(nss*G0_RTs[s] + nslogns - nss*log(n) + nss*log(p/1e5));
+        L += Ru*T*(nss*G0_RTs[s] + nslogns - nss*log(nn) + nss*log(p/1e5));
     }
 
     for (int j=0; j<nel; j++){
@@ -175,27 +174,46 @@ static double lagrangian(double* S, double* a, double* G0_RTs, double p, double 
     return L;
 }
 
+static double analytic_lagrangian_derivative(double* S, double* a, double* G0_RTs, double p, double T, double n,
+                                             double* ns, double* bi0, int nsp, int nel, int s){
+
+    double dLdns = Ru*T*(G0_RTs[s] + log(ns[s]) - log(n) + log(p/1e5));
+
+    for (int j=0; j<nel; j++){
+        double ajs = a[j*nsp+s];
+        double lambda_j = -1.0*Ru*T*S[j+1];
+        dLdns += lambda_j*ajs;
+    }
+
+    return dLdns;
+}
+
+
 static void compute_lagrangian_derivatives(double* S, double* a, double* G0_RTs, double p, double T, double n,
                                  double* ns, double* bi0, int nsp, int nel, double* dLdn, int verbose){
     // For verification purposes, we want to numerically differentiate the
     // Lagrangian to check that we have correctly found the actual stationary point.
     double eps = 1e-7;
-    double L = lagrangian(S, a, G0_RTs, p, T, n, ns, bi0, nsp, nel, verbose);
-    if (verbose>1) printf("Lagrangian:[%e]\n   ",L);
+    double L = lagrangian(S, a, G0_RTs, p, T, ns, bi0, nsp, nel, verbose);
+    if (verbose>2) printf("Lagrangian:[%e]\n   ",L);
 
     for (int s=0; s<nsp; s++) {
         double ns_save = ns[s];
         double perturb = ns[s]*eps;
 
+        // Note that it's important to perturb n as well, though the "lagrangian" function below actually
+        // computes n internally to make sure.
         ns[s] += perturb;
-        double L2 = lagrangian(S, a, G0_RTs, p, T, n, ns, bi0, nsp, nel, verbose);
+        double L2 = lagrangian(S, a, G0_RTs, p, T, ns, bi0, nsp, nel, verbose);
         ns[s] = ns_save;
 
         double dLdns = (L2-L)/perturb;
-        if (verbose>1) printf(" dLdn[%d]= %e",s, dLdns);
+
+        double dLdns_a = analytic_lagrangian_derivative(S, a, G0_RTs, p, T, n, ns, bi0, nsp, nel, s);
+        if (verbose>2) printf(" dLdn[%d]= %e (%e) ",s, dLdns, dLdns_a);
         dLdn[s] = dLdns;
     }
-    if (verbose>1) printf("\n");
+    if (verbose>2) printf("\n");
     return;
 }
 
@@ -231,8 +249,7 @@ static void species_corrections(double* S,double* a,double* G0_RTs,double p,doub
         for (i=0; i<nel; i++){
             aispii += a[i*nsp+s]*S[i+1]; // S[i+1] = pi_i, the lagrange multiplier
         }
-        //dlnns[s] = -mu_RTs + dlnn + aispii;     // CEA equations
-        dlnns[s] = -mu_RTs + dlnn + aispii - 1.0; // Newcode vers
+        dlnns[s] = -mu_RTs + dlnn + aispii;     // CEA equations
         //printf("    dlnns[%d] = %f (%f %f %f)\n", s, dlnns[s], -mu_RTs, dlnn, aispii);
     }
     return; 
