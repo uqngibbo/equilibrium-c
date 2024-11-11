@@ -37,9 +37,6 @@ def get_cea_test(p,T,spnames):
 
     return X
 
-# I'm not sure it really makes sense to  compare to CEA
-# anymore, but we'll keep this test with a much looser
-# tolerance.
 class TestCEQ(unittest.TestCase):
     def test_pt(self, verbose=False):
         spnames = ['CO2', 'CO', 'O2']
@@ -50,7 +47,7 @@ class TestCEQ(unittest.TestCase):
         eq = eqc.EqCalculator(spnames)
         Xcea1 = get_cea_test(p,T,spnames)
         Xs1 = eq.pt(p, T, Xs0)
-        assert_array_almost_equal(Xs1, Xcea1, decimal=1)
+        assert_array_almost_equal(Xs1, Xcea1, decimal=4)
 
 if __name__=='__main__':
     unittest.main()

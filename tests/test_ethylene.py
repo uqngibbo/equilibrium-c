@@ -18,7 +18,6 @@ class TestCEQ(unittest.TestCase):
         eq = eqc.EqCalculator(spnames)
         Ms = eq.M
         ceaYs0 = array([0.75,  0.2, 0.05, 0.0, 0.0, 0.0, 0.0])
-        # This is no good any more :(
         ceaXst = {
             'CO': 1.2624e-2,
             'CO2': 8.9029e-2,
@@ -27,18 +26,9 @@ class TestCEQ(unittest.TestCase):
             'N2': 7.6349e-1,
             'O2': 3.3208e-2
         }
-        newXst = {
-            'N2':   0.765441,
-            'O2':   0.030731,
-            'C2H4': 0.000000,
-            'H2':   0.001450,
-            'CO':   0.008364,
-            'CO2':  0.093550,
-            'H2O':  0.100464,
-        }
 
         Xst = zeros(len(spnames))
-        for k,v in newXst.items(): Xst[spnames.index(k)] = v
+        for k,v in ceaXst.items(): Xst[spnames.index(k)] = v
 
         Xs0 = molef_from_massf(ceaYs0, Ms)
 

@@ -9,7 +9,7 @@ from numpy import array, zeros, absolute, linspace
 import eqc
 
 class TestCEQ(unittest.TestCase):
-    def test_thermo(self, verbose=True):
+    def test_thermo(self, verbose=False):
         p = 1.0132*1e5
         T = 3698.04
         spnames = ['CO2', 'CO', 'O2']
@@ -17,18 +17,18 @@ class TestCEQ(unittest.TestCase):
         eq = eqc.EqCalculator(spnames)
         Xs1 = eq.pt(p, T, Xs0)
 
-        # The H, U, and S entries in this string have been
-        # edited to match the new ceq values. sigh...
         ceaoutput = """
         THERMODYNAMIC PROPERTIES
 
         P, BAR            1.0132
         T, K             3698.04
         RHO, KG/CU M   1.0265e-1
-        H, KJ/KG          104.45
-        U, KJ/KG         -855.68
+        H, KJ/KG          576.89
+        U, KJ/KG         -410.21
         G, KJ/KG        -35107.3
-        S, KJ/(KG)(K)     9.5179
+        S, KJ/(KG)(K)     9.6495
+
+
 
         M, (1/n)          31.149
         (dLV/dLP)t      -1.02399

@@ -29,9 +29,9 @@ print(" eqc:" + ''.join([" {:<10.8g}".format(Xs1s) for Xs1s in Xs1]))
 print(" CEA:" + ''.join([" {:<10.8g}".format(Xs1s) for Xs1s in Xst]))
 
 print("\nComputing Lagrangian Derivatives")
-dLdn = eq.verify_equilibrium(p, T, Xs1, 0)
+dLdn = eq.verify_equilibrium(p, T, Xs1, 1)
 dLdn_L2 = sqrt(sum(i*i for i in dLdn))
 
-print(''.join(["dLdn_{}={:<10.8g}".format(spname, dLdns) for spname,dLdns in zip(spnames, dLdn)]))
+print(' '.join(["dLdn_{}={:<10.8g}".format(spname, dLdns) for spname,dLdns in zip(spnames, dLdn)]))
 print("|dLdns|: ", dLdn_L2)
 

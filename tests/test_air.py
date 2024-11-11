@@ -16,8 +16,8 @@ class TestCEQ(unittest.TestCase):
         T = 2500.0
         p = 0.1*101.35e3
         Xs0 = array([0.76, 0.23, 0.0, 0.0, 0.0])
-        #Xst= array([7.48543073e-01, 2.08366049e-01, 7.93468988e-07, 2.07645979e-02, 2.23254866e-02]) # Target with CEA mistake code
-        Xst = array([7.51474273e-01, 2.13161664e-01, 4.82204631e-07, 1.27384726e-02, 2.26251083e-02])
+        Xst= array([7.48543073e-01, 2.08366049e-01, 7.93468988e-07, 2.07645979e-02, 2.23254866e-02]) # Target with CEA mistake code
+        #Xst = array([7.51474273e-01, 2.13161664e-01, 4.82204631e-07, 1.27384726e-02, 2.26251083e-02])
 
 
         eq = eqc.EqCalculator(spnames)
