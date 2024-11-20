@@ -99,6 +99,7 @@ static double compute_residual(double* pij, double* a, double* G0_RTs, double p,
         T      : Temperature (K)
         n      : total moles/mixture kg
         ns     : species moles/mixture kg [nsp]
+        lnns   : natural log of the species moles/mixture kg [nsp]
         nsp    : total number of species
         nel    : total number of elements
 
@@ -228,6 +229,7 @@ static void species_corrections(double* S,double* a,double* G0_RTs,double p,doub
         p      : pressure 
         n      : total moles/mixture kg 
         ns     : species moles/mixture kg [nsp]
+        lnns   : natural log of the species moles/mixture kg [nsp]
         nsp    : total number of species
         nel    : total  number of elements 
 
@@ -263,6 +265,7 @@ static void handle_singularity(double* S,double* a,double* G0_RTs,double p,doubl
         p      : pressure 
         n      : total moles/mixture kg 
         ns     : species moles/mixture kg [nsp]
+        lnns   : natural log of the species moles/mixture kg [nsp]
         nsp    : total number of species
         nel    : total  number of elements 
         verbose: flag to print debugging  information
@@ -286,12 +289,13 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
     /*
     Add corrections to unknown values (ignoring lagrange multipliers)
     Inputs:
-        S : vector of corrections from matrix step [nel+1]
+        S     : vector of corrections from matrix step [nel+1]
         dlnns : vector of species mole/mixture corrections [nsp]
-        nsp : number of species
+        nsp   : number of species
     Outputs:
-        ns : vector of species mole/mixtures [nsp]
-        n  : pointer to total moles/mixture (passed by reference!) [1]
+        ns    : vector of species mole/mixtures [nsp]
+        lnns  : natural log of the species moles/mixture kg [nsp]
+        n     : pointer to total moles/mixture (passed by reference!) [1]
     */
     int s;
     double newlnns,lnn,n_copy,lambda,newns,rdlnns;
