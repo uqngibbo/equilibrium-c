@@ -21,8 +21,8 @@ C library for equilibrium chemistry calculations
 #include "common.h"
 #include "rhou.h"
 
-static void Assemble_Matrices(double* a,double* bi0, double rho0,double u0,double T,double* ns,int nsp,
-                              int nel,double* A, double* B, double* G0_RTs, double* U0_RTs,
+static void Assemble_Matrices(double* a,double* bi0, double rho0,double u0,double T,double* ns,double* lnns,
+                              int nsp, int nel, double* A, double* B, double* G0_RTs, double* U0_RTs,
                               double* Cv0_Rs, double* lewis){
     /*
     Construct Iteration Matrix for reduced Newton Rhapson rhou step, (eqn 2.45 and 2.47 from cea_I)
@@ -56,7 +56,7 @@ static void Assemble_Matrices(double* a,double* bi0, double rho0,double u0,doubl
         akjnjUj = 0.0;
         for (j=0; j<nsp; j++){
             if (ns[j]==0.0) continue;
-            mus_RTj = G0_RTs[j] + log(rho0*ns[j]*Ru*T/1e5);
+            mus_RTj = G0_RTs[j] + lnns[j] + log(rho0*Ru*T/1e5);
             akjnjmuj += a[k*nsp+j]*ns[j]*mus_RTj;
             akjnjUj  += a[k*nsp+j]*ns[j]*U0_RTs[j];
         }
@@ -71,7 +71,7 @@ static void Assemble_Matrices(double* a,double* bi0, double rho0,double u0,doubl
 
     for (j=0; j<nsp; j++){
         if (ns[j]==0.0) continue;
-        mus_RTj = G0_RTs[j] + log(rho0*ns[j]*Ru*T/1e5);
+        mus_RTj = G0_RTs[j] + lnns[j] + log(rho0*Ru*T/1e5);
         njCvj += ns[j]*Cv0_Rs[j];
         njUj2 += ns[j]*U0_RTs[j]*U0_RTs[j];
         njUjmuj += ns[j]*U0_RTs[j]*mus_RTj;
@@ -99,7 +99,7 @@ static void Assemble_Matrices(double* a,double* bi0, double rho0,double u0,doubl
 }
 
 static void species_corrections(double* S,double* a,double* G0_RTs,double* U0_RTs,double rho0,double T,
-                         double* ns, int nsp, int nel, double* dlnns, int verbose){
+                         double* ns, double* lnns, int nsp, int nel, double* dlnns, int verbose){
     /*
     Compute delta_log(ns) from the reduced iteration equations from 
     equation 2.18m using the other deltas in S
@@ -130,7 +130,7 @@ static void species_corrections(double* S,double* a,double* G0_RTs,double* U0_RT
     
     for (s=0; s<nsp; s++) {
         if (ns[s]==0.0) { dlnns[s] = 0.0; continue;}
-        mus_RTs = G0_RTs[s] + log(rho0*ns[s]*Ru*T/1e5);
+        mus_RTs = G0_RTs[s] + lnns[s] + log(rho0*Ru*T/1e5);
 
         aispii = 0.0;
         for (i=0; i<nel; i++){
@@ -142,7 +142,7 @@ static void species_corrections(double* S,double* a,double* G0_RTs,double* U0_RT
 }
 
 static void handle_singularity(double* S,double* a,double* G0_RTs,double* U0_RTs,double rho, double T,
-                         double* ns, double n, int nsp, int nel, double* dlnns, int verbose){
+                         double* ns, double* lnns, double n, int nsp, int nel, double* dlnns, int verbose){
     /*
     Compute delta_log(ns) from the reduced iteration equations from 
     equation 2.18m using the other deltas in S
@@ -168,14 +168,14 @@ static void handle_singularity(double* S,double* a,double* G0_RTs,double* U0_RTs
         if (ns[s]!=0.0) continue;  // Ignore non trace species
 
         ns[s] = fmax(RESET*n*TRACELIMIT, ns[s]); // Reset trace trace species to a small but finite number
-        species_corrections(S,a,G0_RTs,U0_RTs,rho,T,ns,nsp,nel,dlnns,0);
+        species_corrections(S,a,G0_RTs,U0_RTs,rho,T,ns,lnns,nsp,nel,dlnns,0);
         if (dlnns[s]<0.0) ns[s] = 0.0; // Re-zero any species with negative predicted dlnns
         if (verbose>1) printf("   faux dlnns: %f changed to: %e \n", dlnns[s], ns[s]);
     }
     return; 
 }
 
-static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* T,double* np,int verbose){
+static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* lnns,double* T,double* np,int verbose){
     /*
     Add corrections to unknown values (ignoring lagrange multipliers)
     Inputs:
@@ -188,7 +188,7 @@ static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* T
         np : pointer to n, total moles/mixture (passed by reference!) [1]
     */
     int s;
-    double lnns,lnT,n,lnn,lambda;
+    double lnT,n,lnn,lambda;
     const char pstring[] = "  s: %d lnns: % f rdlnns: % f dlnns: %f TR: % e lambda: % f\n"; 
     lnT = log(*T); // compute the log of the thing T is pointing to
     lambda = update_limit_factor(lnT, S[0], 0.5);
@@ -202,10 +202,10 @@ static void update_unknowns(double* S,double* dlnns,int nsp,double* ns,double* T
             dlnns[s] = 0.0;
             continue;
         }
-        lnns = log(ns[s]);
         lambda = update_limit_factor(lnn, dlnns[s], 1.0);
-        ns[s] = exp(lnns + lambda*dlnns[s]);
-        if (verbose>1) printf(pstring, s, lnns, lambda*dlnns[s], dlnns[s], 0.0, lambda);
+        lnns[s] = lnns[s] + lambda*dlnns[s];
+        ns[s] = exp(lnns[s]);
+        if (verbose>1) printf(pstring, s, lnns[s], lambda*dlnns[s], dlnns[s], 0.0, lambda);
     }
     n = 0.0; for (s=0; s<nsp; s++) n+=ns[s];
     *np = n;
@@ -270,7 +270,7 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
         X1  : Equilibrium Mole Fraction [nsp]  
         Teq: Equilibrium Temperature 
     */
-    double *A, *B, *S, *G0_RTs, *U0_RTs, *Cv0_Rs, *ns, *bi0, *dlnns; // Dynamic arrays
+    double *A, *B, *S, *G0_RTs, *U0_RTs, *Cv0_Rs, *ns, *lnns, *bi0, *dlnns; // Dynamic arrays
     int neq,s,i,k,errorcode;
     double n,M1,T,errorrms;
 
@@ -284,23 +284,25 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
     U0_RTs= (double*) malloc(sizeof(double)*nsp);     // Species Internal Energy
     Cv0_Rs= (double*) malloc(sizeof(double)*nsp);     // Species Specific Heat @ Const. volume 
     ns    = (double*) malloc(sizeof(double)*nsp);     // Species moles/mixture mass
+    lnns  = (double*) malloc(sizeof(double)*nsp);     // Natural log of species moles/mixture mass
     bi0   = (double*) malloc(sizeof(double)*nel);     // starting composition coefficients
     dlnns = (double*) malloc(sizeof(double)*nsp);     // raw change in log(ns)
 
     composition_guess(a, M, X0, nsp, nel, ns, &n, bi0);
     T = temperature_guess(nsp, u, M, X0, lewis);
     if (verbose>0) printf("Guess T: %f\n", T);
+    for (s=0; s<nsp; s++) lnns[s] = log(ns[s]);
 
     // Begin Iterations
     for (k=0; k<attempts; k++){
-        Assemble_Matrices(a,bi0,rho,u,T,ns,nsp,nel,A,B,G0_RTs,U0_RTs,Cv0_Rs,lewis);
+        Assemble_Matrices(a,bi0,rho,u,T,ns,lnns,nsp,nel,A,B,G0_RTs,U0_RTs,Cv0_Rs,lewis);
         errorcode = solve_matrix(A, B, S, neq);
         if (errorcode!=0) {
-            handle_singularity(S,a,G0_RTs,U0_RTs,rho,T,ns,n,nsp,nel,dlnns,verbose);
+            handle_singularity(S,a,G0_RTs,U0_RTs,rho,T,ns,lnns,n,nsp,nel,dlnns,verbose);
             continue;
         }
-        species_corrections(S,a,G0_RTs,U0_RTs,rho,T,ns,nsp,nel,dlnns,verbose);
-        update_unknowns(S, dlnns, nsp, ns, &T, &n, verbose);
+        species_corrections(S,a,G0_RTs,U0_RTs,rho,T,ns,lnns,nsp,nel,dlnns,verbose);
+        update_unknowns(S, dlnns, nsp, ns, lnns, &T, &n, verbose);
         handle_trace_species_locking(a, n, nsp, nel, ns, bi0, dlnns, verbose);
         errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, neq, dlnns);
 
@@ -353,6 +355,7 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
     free(U0_RTs);
     free(Cv0_Rs);
     free(ns);
+    free(lnns);
     free(bi0);
     free(dlnns);
     return errorcode;
