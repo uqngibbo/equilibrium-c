@@ -98,6 +98,65 @@ static void Assemble_Matrices(double* a,double* bi0, double rho0,double u0,doubl
     return;
 }
 
+static double compute_residual(double* pij, double* a, double* G0_RTs, double rho0, double T,
+                               double* ns, double* lnns, double* bi0, int nsp, int nel, double* lewis, int verbose){
+    /*
+    Compute the L2 norm of the rhou Lagrangian derivatives. Note as per the paper, we actually compute
+    ns[s] times each species derivative, to make sure that the equations are nonsingular for ns[s] = 0.0
+    but still have the same root as the original equations.
+
+    Inputs:
+        pij    : Corrections (dlog(n), pi1, pi2, pi3 ...)  [nel+1]
+        a      : elemental composition array [nel,nsp]
+        G0_RTs : Gibbs free energy of each species, divided by RT [nsp]
+        rho0   : (constant) density (kg/m3)
+        T      : Temperature (K)
+        ns     : species moles/mixture kg [nsp]
+        lnns   : natural log of the species moles/mixture kg [nsp]
+        nsp    : total number of species
+        nel    : total number of elements
+
+    Outputs:
+        double : L2 norm of the residual of the nonlinear equations being solved.
+    */
+    for (int s=0; s<nsp; s++){
+        double* lp = lewis + 9*3*s;
+        G0_RTs[s] = compute_G0_RT(T, lp);
+    }
+
+    double residual = 0.0;
+
+    for (int s=0; s<nsp; s++){
+        // ns*log(ns) is badly behaved at ns==0.0, but should be fine at any other nonnegative number
+        double nss = ns[s];
+        double nslogns = nss*lnns[s];
+
+        // Equation ?? from the eqc paper
+        double Rs = nss*G0_RTs[s] + nslogns + nss*log(rho0*Ru*T/1e5);
+        double pijj = 0.0;
+        for (int j=0; j<nel; j++){
+            pijj += pij[1+j]*a[j*nsp + s];
+        }
+        // Minus here because pi is the opposite sign to lambda.
+        Rs -= nss*pijj;
+        if (verbose>1) printf("    Fs[%d]=%e\n", s, Rs);
+        residual += Rs*Rs;
+    }
+
+    // Equation ?? from the eqc paper
+    for (int j=0; j<nel; j++){
+        double Rs = 0.0;
+        for (int s=0; s<nsp; s++){
+            Rs += a[j*nsp + s]*ns[s];
+        }
+        Rs -= bi0[j];
+        if (verbose>1) printf("    Fj[%d]=%e\n", j, Rs);
+        residual += Rs*Rs;
+    }
+
+    return sqrt(residual);
+}
+
 static void species_corrections(double* S,double* a,double* G0_RTs,double* U0_RTs,double rho0,double T,
                          double* ns, double* lnns, int nsp, int nel, double* dlnns, int verbose){
     /*
@@ -304,7 +363,7 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
         species_corrections(S,a,G0_RTs,U0_RTs,rho,T,ns,lnns,nsp,nel,dlnns,verbose);
         update_unknowns(S, dlnns, nsp, ns, lnns, &T, &n, verbose);
         handle_trace_species_locking(a, n, nsp, nel, ns, bi0, dlnns, verbose);
-        errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, neq, dlnns);
+        errorrms= compute_residual(S, a, G0_RTs, rho, T, ns, lnns, bi0, nsp, nel, lewis, verbose);
 
         if (verbose>0){
             printf("iter %2d: [%f]",k,T);
