@@ -61,6 +61,61 @@ static void Assemble_Matrices(double* a,double* bi0, double rho, double T, doubl
     return;
 }
 
+static double compute_residual(double* pij, double* a, double* G0_RTs, double rhot, double T,
+                               double* ns, double* lnns, double* bi0, int nsp, int nel, double* lewis,
+                               int verbose){
+    /*
+    Compute the L2 norm of the rhoT Lagrangian derivatives. Note as per the paper, we actually compute
+    ns[s] times each species derivative, to make sure that the equations are nonsingular for ns[s] = 0.0
+    but still have the same root as the original equations.
+
+    Inputs:
+        pij    : Corrections (dlog(n), pi1, pi2, pi3 ...)  [nel+1]
+        a      : elemental composition array [nel,nsp]
+        G0_RTs : Gibbs free energy of each species, divided by RT [nsp]
+        rhot   : (constant) density (kg/m3)
+        T      : Temperature (K)
+        ns     : species moles/mixture kg [nsp]
+        lnns   : natural log of the species moles/mixture kg [nsp]
+        nsp    : total number of species
+        nel    : total number of elements
+
+    Outputs:
+        double : L2 norm of the residual of the nonlinear equations being solved.
+    */
+    double residual = 0.0;
+
+    for (int s=0; s<nsp; s++){
+        double nss = ns[s];
+        double nslogns = nss*lnns[s];
+
+        // Equation ?? from the eqc paper.
+        // We aren't solving for anything but the lagrange multipliers in rhoT
+        double Rs = nss*G0_RTs[s] + nslogns + nss*log(rhot*Ru*T/1e5);
+        double pijj = 0.0;
+        for (int j=0; j<nel; j++){
+            pijj += pij[j]*a[j*nsp + s];
+        }
+        // Minus here because pi is the opposite sign to lambda.
+        Rs -= nss*pijj;
+        if (verbose>1) printf("    Fs[%d]=%e\n", s, Rs);
+        residual += Rs*Rs;
+    }
+
+    // Equation ?? from the eqc paper
+    for (int j=0; j<nel; j++){
+        double Rs = 0.0;
+        for (int s=0; s<nsp; s++){
+            Rs += a[j*nsp + s]*ns[s];
+        }
+        Rs -= bi0[j];
+        if (verbose>1) printf("    Fj[%d]=%e\n", j, Rs);
+        residual += Rs*Rs;
+    }
+
+    return sqrt(residual);
+}
+
 static void species_corrections(double* S, double* a, double* G0_RTs, double rho, double T,
                          double* ns, double* lnns, int nsp, int nel, double* dlnns, int verbose){
     /*
@@ -192,6 +247,7 @@ int solve_rhot(double rho, double T, double* X0, int nsp, int nel, double* lewis
     dlnns = (double*) malloc(sizeof(double)*nsp);     // raw change in log(ns)
 
     composition_guess(a, M, X0, nsp, nel, ns, &n, bi0);
+    for (s=0; s<nsp; s++) lnns[s] = log(ns[s]);
 
     // Gibbs free energy is known to begin with because we have T
     for (s=0; s<nsp; s++){
@@ -210,7 +266,7 @@ int solve_rhot(double rho, double T, double* X0, int nsp, int nel, double* lewis
         species_corrections(S,a,G0_RTs,rho,T,ns,lnns,nsp,nel,dlnns,verbose);
         update_unknowns(S, dlnns, nsp, ns,lnns, &n, verbose);
         handle_trace_species_locking(a, n, nsp, nel, ns, bi0, dlnns, verbose);
-        errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, neq, dlnns);
+        errorrms = compute_residual(S, a, G0_RTs, rho, T, ns, lnns, bi0, nsp, nel, lewis, verbose);
 
         if (verbose>0){
             printf("iter %2d: [%f]",k,T);
