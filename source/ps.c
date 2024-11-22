@@ -164,6 +164,78 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
     return;
 }
 
+static double compute_residual(double* pij, double* a, double* G_RTs, double* S_Rs, double p, double st, double n,
+                               double* ns, double* lnns, double* bi0, int nsp, int nel, int verbose){
+    /*
+    Compute the L2 of the ps Lagrangian derivatives. Note as per the paper, we actually compute
+    ns[s] times equation (44). This ensures that the equations are nonsingular for ns[s] -> 0.0
+    but still have the same root as the original equations.
+
+    Inputs:
+        pij    : Corrections (dlog(n), dlog(T), pi1, pi2, pi3 ...)  [nel+1]
+        a      : elemental composition array [nel,nsp]
+        G_RTs : Gibbs free energy of each species, divided by RT [nsp]
+        p      : pressure  (Pa)
+        st     : target entropy (J/kg/K)
+        n      : total moles/mixture kg
+        ns     : species moles/mixture kg [nsp]
+        lnns   : natural log of the species moles/mixture kg [nsp]
+        nsp    : total number of species
+        nel    : total number of elements
+
+    Outputs:
+        double : L2 norm of the residual of the nonlinear equations being solved.
+    */
+
+    double residual = 0.0;
+
+    for (int s=0; s<nsp; s++){
+        // ns*log(ns) is badly behaved at ns==0.0, but should be fine at any other nonnegative number
+        double nss = ns[s];
+
+        // Equation ?? from the eqc paper. Note for ps we have both S=[n, T, pi0, pi1, ...]
+        double Rs = nss*G_RTs[s];
+        double pijj = 0.0;
+        for (int j=0; j<nel; j++){
+            pijj += pij[2+j]*a[j*nsp + s];
+        }
+        Rs -= nss*pijj;
+        if (verbose>1) printf("    Fs[%d]=%e\n", s, Rs);
+        residual += Rs*Rs;
+    }
+
+    // Equation ?? from the eqc paper
+    for (int j=0; j<nel; j++){
+        double Rs = 0.0;
+        for (int s=0; s<nsp; s++){
+            Rs += a[j*nsp + s]*ns[s];
+        }
+        Rs -= bi0[j];
+        if (verbose>1) printf("    Fj[%d]=%e\n", j, Rs);
+        residual += Rs*Rs;
+    }
+
+    // Equation ?? from the eqc paper
+    double Rs = n;
+    for (int s=0; s<nsp; s++){
+        Rs -= ns[s];
+    }
+    if (verbose>1) printf("    Fn=%e\n", Rs);
+    residual += Rs*Rs;
+
+    // For ps, the Fs, Fj, and Fn components are the same as for pt. However, for ps we add the following
+    // nonlinear equation to the set being solved, which is essentially just s=s0, or equation 2.15a from CEA.
+    // To keep the magnitude of this in line with the other equations, we nondimensionalise by Ru
+    Rs = st/Ru;
+    for (int s=0; s<nsp; s++){
+        Rs -= ns[s]*S_Rs[s];
+    }
+    if (verbose>1) printf("    FS=%e\n", Rs);
+    residual += Rs*Rs;
+
+    return sqrt(residual);
+}
+
 static void species_corrections(double* S,double* a,double* mu_RTs,double* H_RTs, double p,double n,
                                 double* ns, int nsp, int nel, double* dlnns, int verbose){
     /*
@@ -370,7 +442,7 @@ int solve_ps(double pt,double st,double* X0,int nsp,int nel,double* lewis,double
         species_corrections(S,a,mu_RTs,H_RTs,pt,n,ns,nsp,nel,dlnns,verbose); // FIXME? Using old n,T
         update_unknowns(S,dlnns,nsp,nel,ns,lnns,&n,&T,verbose);
         handle_trace_species_locking(a, n, nsp, nel, ns, bi0, dlnns, verbose);
-        errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, neq, dlnns);
+        errorrms = compute_residual(S, a, mu_RTs, S_Rs, pt, st, n, ns, lnns, bi0, nsp, nel, verbose);
 
         if (verbose>0){
             printf("iter %2d: [%f]",k,T);
