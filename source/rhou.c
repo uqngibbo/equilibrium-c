@@ -98,8 +98,9 @@ static void Assemble_Matrices(double* a,double* bi0, double rho0,double u0,doubl
     return;
 }
 
-static double compute_residual(double* pij, double* a, double* G0_RTs, double rho0, double T,
-                               double* ns, double* lnns, double* bi0, int nsp, int nel, double* lewis, int verbose){
+static double compute_residual(double* pij, double* a, double* G0_RTs, double* U0_RTs, double rhot, double T,
+                               double ut, double* ns, double* lnns, double* bi0, int nsp, int nel, double* lewis,
+                               int verbose){
     /*
     Compute the L2 norm of the rhou Lagrangian derivatives. Note as per the paper, we actually compute
     ns[s] times each species derivative, to make sure that the equations are nonsingular for ns[s] = 0.0
@@ -109,7 +110,7 @@ static double compute_residual(double* pij, double* a, double* G0_RTs, double rh
         pij    : Corrections (dlog(n), pi1, pi2, pi3 ...)  [nel+1]
         a      : elemental composition array [nel,nsp]
         G0_RTs : Gibbs free energy of each species, divided by RT [nsp]
-        rho0   : (constant) density (kg/m3)
+        rhot   : (constant) density (kg/m3)
         T      : Temperature (K)
         ns     : species moles/mixture kg [nsp]
         lnns   : natural log of the species moles/mixture kg [nsp]
@@ -132,7 +133,7 @@ static double compute_residual(double* pij, double* a, double* G0_RTs, double rh
         double nslogns = nss*lnns[s];
 
         // Equation ?? from the eqc paper
-        double Rs = nss*G0_RTs[s] + nslogns + nss*log(rho0*Ru*T/1e5);
+        double Rs = nss*G0_RTs[s] + nslogns + nss*log(rhot*Ru*T/1e5);
         double pijj = 0.0;
         for (int j=0; j<nel; j++){
             pijj += pij[1+j]*a[j*nsp + s];
@@ -153,6 +154,16 @@ static double compute_residual(double* pij, double* a, double* G0_RTs, double rh
         if (verbose>1) printf("    Fj[%d]=%e\n", j, Rs);
         residual += Rs*Rs;
     }
+
+    // For rhou, we add the following nonlinear equation to the set being solved,
+    // which is essentially just u=u0, or equation 2.37a from CEA.
+    // To keep the magnitude of this in line with the other equations, we nondimensionalise by Ru
+    double Rs = ut/(Ru*T);
+    for (int s=0; s<nsp; s++){
+        Rs -= ns[s]*U0_RTs[s];
+    }
+    if (verbose>1) printf("    Fu=%e\n", Rs);
+    residual += Rs*Rs;
 
     return sqrt(residual);
 }
@@ -363,7 +374,7 @@ int solve_rhou(double rho,double u,double* X0,int nsp,int nel,double* lewis,doub
         species_corrections(S,a,G0_RTs,U0_RTs,rho,T,ns,lnns,nsp,nel,dlnns,verbose);
         update_unknowns(S, dlnns, nsp, ns, lnns, &T, &n, verbose);
         handle_trace_species_locking(a, n, nsp, nel, ns, bi0, dlnns, verbose);
-        errorrms= compute_residual(S, a, G0_RTs, rho, T, ns, lnns, bi0, nsp, nel, lewis, verbose);
+        errorrms= compute_residual(S, a, G0_RTs, U0_RTs, rho, T, u, ns, lnns, bi0, nsp, nel, lewis, verbose);
 
         if (verbose>0){
             printf("iter %2d: [%f]",k,T);
