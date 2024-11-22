@@ -21,8 +21,8 @@ C library for equilibrium chemistry calculations
 #include "common.h"
 #include "rhou.h"
 
-static void Assemble_Matrices(double* a,double* bi0, double rho, double T, double* ns, int nsp,
-                              int nel, double* A, double* B, double* G0_RTs){
+static void Assemble_Matrices(double* a,double* bi0, double rho, double T, double* ns, double* lnns,
+                              int nsp, int nel, double* A, double* B, double* G0_RTs){
     /*
     Construct Iteration Matrix for reduced Newton Rhapson rhoT step, (eqn 2.45 from cea_I)
     */
@@ -43,8 +43,7 @@ static void Assemble_Matrices(double* a,double* bi0, double rho, double T, doubl
         }
         akjnjmuj = 0.0;
         for (j=0; j<nsp; j++){
-            if (ns[j]==0.0) continue;
-            mus_RTj = G0_RTs[j] + log(rho*ns[j]*Ru*T/1e5);
+            mus_RTj = G0_RTs[j] + lnns[j] + log(rho*Ru*T/1e5);
             akjnjmuj += a[k*nsp+j]*ns[j]*mus_RTj;
         }
         B[k] = bi0[k] - bk + akjnjmuj; // RHS of kth equation 2.45
@@ -63,7 +62,7 @@ static void Assemble_Matrices(double* a,double* bi0, double rho, double T, doubl
 }
 
 static void species_corrections(double* S, double* a, double* G0_RTs, double rho, double T,
-                         double* ns, int nsp, int nel, double* dlnns, int verbose){
+                         double* ns, double* lnns, int nsp, int nel, double* dlnns, int verbose){
     /*
     Compute delta_log(ns) from the reduced iteration equations from 
     equation 2.18m using the other deltas in S
@@ -84,8 +83,7 @@ static void species_corrections(double* S, double* a, double* G0_RTs, double rho
     int s,i;
 
     for (s=0; s<nsp; s++) {
-        if (ns[s]==0.0) { dlnns[s] = 0.0; continue;}
-        mus_RTs = G0_RTs[s] + log(rho*ns[s]*Ru*T/1e5);
+        mus_RTs = G0_RTs[s] + lnns[s] + log(rho*Ru*T/1e5);
 
         aispii = 0.0;
         for (i=0; i<nel; i++){
@@ -97,7 +95,7 @@ static void species_corrections(double* S, double* a, double* G0_RTs, double rho
 }
 
 static void handle_singularity(double* S, double* a, double* G0_RTs, double rho, double T,
-                         double* ns, double n, int nsp, int nel, double* dlnns, int verbose){
+                         double* ns, double* lnns, double n, int nsp, int nel, double* dlnns, int verbose){
     /*
     Compute delta_log(ns) from the reduced iteration equations from 
     equation 2.18m using the other deltas in S
@@ -122,14 +120,14 @@ static void handle_singularity(double* S, double* a, double* G0_RTs, double rho,
         if (ns[s]!=0.0) continue;  // Ignore non trace species
 
         ns[s] = fmax(RESET*n*TRACELIMIT, ns[s]); // Reset trace trace species to a small but finite number
-        species_corrections(S,a,G0_RTs,rho,T,ns,nsp,nel,dlnns,0);
+        species_corrections(S,a,G0_RTs,rho,T,ns,lnns,nsp,nel,dlnns,0);
         if (dlnns[s]<0.0) ns[s] = 0.0; // Re-zero any species with negative predicted dlnns
         if (verbose>1) printf("   faux dlnns: %f changed to: %e \n", dlnns[s], ns[s]);
     }
     return; 
 }
 
-static void update_unknowns(double* S, double* dlnns, int nsp, double* ns, double* np, int verbose){
+static void update_unknowns(double* S, double* dlnns, int nsp, double* ns, double* lnns, double* np, int verbose){
     /*
     Add corrections to unknown values (ignoring lagrange multipliers)
     Inputs:
@@ -137,25 +135,21 @@ static void update_unknowns(double* S, double* dlnns, int nsp, double* ns, doubl
         dlnns : vector of species mole/mixture corrections [nsp]
         nsp : number of species
     Outputs:
-        ns : vector of species mole/mixtures [nsp]
-        np : pointer to n, total moles/mixture (passed by reference!) [1]
+        ns   : vector of species mole/mixtures [nsp]
+        lnns : vector of log species mole/mixtures [nsp]
+        np   : pointer to n, total moles/mixture (passed by reference!) [1]
     */
     int s;
-    double lnns,n,lnn,lambda;
+    double n,lnn,lambda;
     const char pstring[] = "  s: %d lnns: % f rdlnns: % f dlnns: %f TR: % e lambda: % f\n"; 
     n = *np;
     lnn=log(n);
 
     for (s=0; s<nsp; s++){
-        if (ns[s]==0.0) {
-            if (verbose>1) printf(pstring, s, 0.0, 0.0, dlnns[s], 0.0, 0.0);
-            dlnns[s] = 0.0;
-            continue;
-        }
-        lnns = log(ns[s]);
         lambda = update_limit_factor(lnn, dlnns[s], 1.0);
-        ns[s] = exp(lnns + lambda*dlnns[s]);
-        if (verbose>1) printf(pstring, s, lnns, lambda*dlnns[s], dlnns[s], 0.0, lambda);
+        lnns[s] = lnns[s] + lambda*dlnns[s];
+        ns[s] = exp(lnns[s]);
+        if (verbose>1) printf(pstring, s, lnns[s], lambda*dlnns[s], dlnns[s], 0.0, lambda);
     }
     n = 0.0; for (s=0; s<nsp; s++) n+=ns[s];
     *np = n;
@@ -180,7 +174,7 @@ int solve_rhot(double rho, double T, double* X0, int nsp, int nel, double* lewis
     Output:
         X1  : Equilibrium Mole Fraction [nsp]  
     */
-    double *A, *B, *S, *G0_RTs, *ns, *bi0, *dlnns; // Dynamic arrays
+    double *A, *B, *S, *G0_RTs, *ns, *lnns, *bi0, *dlnns; // Dynamic arrays
     double *lp;
     int neq,s,i,k,errorcode;
     double n,M1,errorrms;
@@ -193,6 +187,7 @@ int solve_rhot(double rho, double T, double* X0, int nsp, int nel, double* lewis
     S     = (double*) malloc(sizeof(double)*neq);     // Iteration unknown vector
     G0_RTs= (double*) malloc(sizeof(double)*nsp);     // Species Gibbs Free Energy
     ns    = (double*) malloc(sizeof(double)*nsp);     // Species moles/mixture mass
+    lnns  = (double*) malloc(sizeof(double)*nsp);     // Log species moles/mixture mass
     bi0   = (double*) malloc(sizeof(double)*nel);     // starting composition coefficients
     dlnns = (double*) malloc(sizeof(double)*nsp);     // raw change in log(ns)
 
@@ -206,14 +201,14 @@ int solve_rhot(double rho, double T, double* X0, int nsp, int nel, double* lewis
 
     // Begin Iterations
     for (k=0; k<attempts; k++){
-        Assemble_Matrices(a,bi0,rho,T,ns,nsp,nel,A,B,G0_RTs);
+        Assemble_Matrices(a,bi0,rho,T,ns,lnns,nsp,nel,A,B,G0_RTs);
         errorcode = solve_matrix(A, B, S, neq);
         if (errorcode!=0) {
-            handle_singularity(S,a,G0_RTs,rho,T,ns,n,nsp,nel,dlnns,verbose);
+            handle_singularity(S,a,G0_RTs,rho,T,ns,lnns,n,nsp,nel,dlnns,verbose);
             continue;
         }
-        species_corrections(S,a,G0_RTs,rho,T,ns,nsp,nel,dlnns,verbose);
-        update_unknowns(S, dlnns, nsp, ns, &n, verbose);
+        species_corrections(S,a,G0_RTs,rho,T,ns,lnns,nsp,nel,dlnns,verbose);
+        update_unknowns(S, dlnns, nsp, ns,lnns, &n, verbose);
         handle_trace_species_locking(a, n, nsp, nel, ns, bi0, dlnns, verbose);
         errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, neq, dlnns);
 
@@ -263,6 +258,7 @@ int solve_rhot(double rho, double T, double* X0, int nsp, int nel, double* lewis
     free(S);
     free(G0_RTs);
     free(ns);
+    free(lnns);
     free(bi0);
     free(dlnns);
     return errorcode;
