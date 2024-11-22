@@ -22,8 +22,8 @@ C library for equilibrium chemistry calculations
 #include "ps.h"
 
 static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double T,double n,double* ns,
-                              int nsp, int nel,double* A, double* B, double* mu_RTs, double* H_RTs,
-                              double* Cp_Rs, double* S_Rs,  double* lewis){
+                              double* lnns, int nsp, int nel,double* A, double* B, double* mu_RTs,
+                              double* H_RTs, double* Cp_Rs, double* S_Rs,  double* lewis){
     /*
     Construct Iteration Matrix for reduced Newton Rhapson step, (eqn 2.24 2.28 2.26 from cea_I)
     Inputs:
@@ -33,7 +33,8 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
         st     : target specific entropy (J/kg)
         T      : current guess of temperature (K)
         n      : current guess of mixture weight (mol/kg)
-        ns     : current guess of species mixture weights (mol/kg) [nsp]
+        ns     : current guess of species specific molarities (mol/kg) [nsp]
+        lnns   : current guess of the log of species specific molarities (mol/kg) [nsp]
         nsp    : total number of species
         nel    : total  number of elements 
         mu_RTs : Chemical potential of each species, divided by RT [nsp]
@@ -67,8 +68,8 @@ static void Assemble_Matrices(double* a,double* bi0, double pt,double st,double 
         S0_Rs  = compute_S0_R(T, lp);                    // entropy at one BAR
 
         if (ns[s]!=0.0){
-            mu_RTs[s] = G0_RTs + log(ns[s]) - lnn + lnp;
-            S_Rs[s]   = S0_Rs  - log(ns[s]) + lnn - lnp;     // entropy at current pressure
+            mu_RTs[s] = G0_RTs + lnns[s] - lnn + lnp;
+            S_Rs[s]   = S0_Rs  - lnns[s] + lnn - lnp;     // entropy at current pressure
         }
         else {
             // Triggered if ns[s]==0. Note that in this situation mu_RTs and S_Rs are actually
@@ -233,8 +234,8 @@ static void handle_singularity(double* S,double* a,double* mu_RTs,double* H_RTs,
     return; 
 }
 
-static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,double* n,double* T,
-                            int verbose){
+static void update_unknowns(double* S, double* dlnns, int nsp, int nel, double* ns, double* lnns,
+                            double* n, double* T, int verbose){
     /*
     Add corrections to unknown values (ignoring lagrange multipliers)
     Inputs:
@@ -242,12 +243,13 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
         dlnns : vector of species mole/mixture corrections [nsp]
         nsp : number of species
     Outputs:
-        ns : vector of species mole/mixtures [nsp]
-        n  : pointer to total moles/mixture (passed by reference!) [1]
-        T  : pointer to current Temperature (passed by reference!) [1]
+        ns  : vector of species mole/mixtures [nsp]
+        lnns: vector of log species mole/mixtures [nsp]
+        n   : pointer to total moles/mixture (passed by reference!) [1]
+        T   : pointer to current Temperature (passed by reference!) [1]
     */
     int s;
-    double lnns,lnn,n_copy,lambda,newns,rdlnns,lnT,T_copy;
+    double lnn,n_copy,lambda,rdlnns,lnT,T_copy;
     const char pstring[] = "  s: %d lnns: % f rdlnns: % f dlnns: %f TR: % e lambda: % f\n"; 
 
     lnn = log(*n); // compute the log of the thing n is pointing to
@@ -266,14 +268,12 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,double* ns,d
             dlnns[s] = 0.0;
             continue;
         }
-        lnns = log(ns[s]);
         lambda = update_limit_factor(lnn, dlnns[s], 0.5);
-        newns = exp(lnns + lambda*dlnns[s]);
-        rdlnns = log(newns) - lnns;
-        ns[s] = newns;
-        lnns = log(newns);
+        lnns[s] = lnns[s] + lambda*dlnns[s];
+        rdlnns = lambda*dlnns[s];
+        ns[s] = exp(lnns[s]);
 
-        if (verbose>1) printf(pstring, s, lnns, rdlnns, dlnns[s], ns[s]/n_copy/TRACELIMIT, lambda);
+        if (verbose>1) printf(pstring, s, lnns[s], rdlnns, dlnns[s], ns[s]/n_copy/TRACELIMIT, lambda);
     }
 
     return;
@@ -335,7 +335,7 @@ int solve_ps(double pt,double st,double* X0,int nsp,int nel,double* lewis,double
         X1  : Equilibrium Mole Fraction [nsp]  
         Teq: Equilibrium Temperature 
     */
-    double *A, *B, *S, *mu_RTs, *H_RTs, *S_Rs, *Cp_Rs, *ns, *bi0, *dlnns; // Dynamic arrays
+    double *A, *B, *S, *mu_RTs, *H_RTs, *S_Rs, *Cp_Rs, *ns, *lnns, *bi0, *dlnns; // Dynamic arrays
     int neq,s,i,k,errorcode;
     double n,M1,T,errorrms;
 
@@ -350,23 +350,25 @@ int solve_ps(double pt,double st,double* X0,int nsp,int nel,double* lewis,double
     S_Rs  = (double*) malloc(sizeof(double)*nsp);     // Species Molar Entropy
     Cp_Rs = (double*) malloc(sizeof(double)*nsp);     // Species Specific Heat @ Const. pressure 
     ns    = (double*) malloc(sizeof(double)*nsp);     // Species moles/mixture mass
+    lnns  = (double*) malloc(sizeof(double)*nsp);     // Species moles/mixture mass
     bi0   = (double*) malloc(sizeof(double)*nel);     // starting composition coefficients
     dlnns = (double*) malloc(sizeof(double)*nsp);     // raw change in log(ns)
 
     composition_guess(a, M, X0, nsp, nel, ns, &n, bi0);
     T = temperature_guess(nsp, st, pt, n, ns, lewis);
     if (verbose>0) printf("Guess T from ps: %f\n", T);
+    for (s=0; s<nsp; s++) lnns[s] = log(ns[s]);
 
     // Begin Iterations
     for (k=0; k<attempts; k++){
-        Assemble_Matrices(a,bi0,pt,st,T,n,ns,nsp,nel,A,B,mu_RTs,H_RTs,Cp_Rs,S_Rs,lewis);
+        Assemble_Matrices(a,bi0,pt,st,T,n,ns,lnns,nsp,nel,A,B,mu_RTs,H_RTs,Cp_Rs,S_Rs,lewis);
         errorcode = solve_matrix(A, B, S, neq);
         if (errorcode!=0) {
             handle_singularity(S,a,mu_RTs,H_RTs,pt,n,ns,nsp,nel,dlnns,verbose);
             continue;
         }
         species_corrections(S,a,mu_RTs,H_RTs,pt,n,ns,nsp,nel,dlnns,verbose); // FIXME? Using old n,T
-        update_unknowns(S,dlnns,nsp,nel,ns,&n,&T,verbose);
+        update_unknowns(S,dlnns,nsp,nel,ns,lnns,&n,&T,verbose);
         handle_trace_species_locking(a, n, nsp, nel, ns, bi0, dlnns, verbose);
         errorrms = constraint_errors(S, a, bi0, ns, nsp, nel, neq, dlnns);
 
@@ -420,6 +422,7 @@ int solve_ps(double pt,double st,double* X0,int nsp,int nel,double* lewis,double
     free(S_Rs);
     free(Cp_Rs);
     free(ns);
+    free(lnns);
     free(bi0);
     free(dlnns);
     return errorcode;
