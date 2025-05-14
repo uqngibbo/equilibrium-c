@@ -5,7 +5,7 @@
 - References:
 
     "equilibrium-c: A Lightweight Modern Equilibrium Chemistry Calculator for Hypersonic Flow Applications"\
-    Preprint available on [arxiv.org](https://arxiv.org/abs/2412.07166), 2023
+    Preprint available on [arxiv.org](https://arxiv.org/abs/2412.07166), 2023\
     Nicholas N. Gibbons
 
     "Computer Program for Calculation of Complex Equilibrium Compositions and Applications"\
