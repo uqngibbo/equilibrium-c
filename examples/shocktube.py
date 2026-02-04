@@ -25,6 +25,12 @@ def expand_to_a_ratio(pguess, s6, a_ratio):
     error = rhoV_exit/rhoV_throat - 1.0/a_ratio
     return error
 
+def expand_to_pp_on_pe(p, s5s, pp_on_pe):
+    expanded = s5s.expand_isentropically_to_p(p)
+    pp = expanded.pitot_pressure()
+    pratio = pp/s5s.p
+    return pratio - pp_on_pe
+
 def stna(p1, T1, vi, Ys1, pe, a_ratio):
     """ Shock tube problem with known nozzle area ratio """
     spnames = list(Ys1.keys())
@@ -104,8 +110,10 @@ def stnp(p1, T1, vi, Ys1, pe, pp_on_pe):
     s6 = s5s.expand_isentropically_to_p(p6)
 
     # Compute nozzle exit state 
-    expand_to_pp_on_pe = lambda p : (s5s.expand_isentropically_to_p(p)).pitot_pressure()/s5s.p - pp_on_pe
-    p7 = newton(expand_to_pp_on_pe, s5s.p*0.01)
+    # TODO: We need a better auto guess instead of s5s.p*1e-4
+    # Maybe just aim low?
+    #expand_to_pp_on_pe = lambda p : (s5s.expand_isentropically_to_p(p)).pitot_pressure()/s5s.p - pp_on_pe
+    p7 = newton(expand_to_pp_on_pe, s5s.p*1e-4, args=(s5s, pp_on_pe))
     s7 = s5s.expand_isentropically_to_p(p7)
     return [s1_isf, s2, s5, s5s, s6, s7]
 

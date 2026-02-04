@@ -69,6 +69,7 @@ class GasState(object):
         return self.v/a
 
     def expand_isentropically_to_p(self, p):
+
         state_ht = self.h + self.v**2/2.0
         X, T = self.eq.ps(p, self.s, self.X0)
         h = self.eq.get_h(X, T)
@@ -99,8 +100,8 @@ class GasState(object):
 
     def __repr__(self):
         s = [
-        'p: {:12.3f} Pa  T: {:8.3f} K  rho: {:6.3f} kg/m3  v: {:8.3f} m/s'.format(self.p, self.T, self.rho, self.v),
-        'h: {:12.3f} J/kg   s: {:8.3f} J/kg/K  Mmix: {:5.6f} kg/mol  M: {:5.6f}'.format(self.h, self.s, self.Mmix, self.M),
+        'p: {:8.3f} kPa  T: {:8.3f} K  rho: {:6.3f} kg/m3  v: {:8.3f} m/s'.format(self.p/1e3, self.T, self.rho, self.v),
+        'h: {:6.3f} MJ/kg   s: {:8.3f} J/kg/K  Mmix: {:5.6f} kg/mol  M: {:5.6f}'.format(self.h/1e6, self.s, self.Mmix, self.M),
         ', '.join(['{}:{:8.7f}'.format(k,v) for k,v in zip(self.spnames, self.Y)])
         ]
         return '\n'.join(s)
