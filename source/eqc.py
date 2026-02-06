@@ -165,6 +165,17 @@ class EqCalculator(object):
         if recode!=0: raise Exception("Equilibrium Calc Failed.")
         return Xs1
 
+    def satpt(self, p, T, Gc, ic, Xs0, verbose=0):
+        """ Solve a saturated pt problem where one of the elements is an known """
+
+        if Xs0.size!=self.nsp: raise Exception('Mismatched array size {}!={}'.format(Xs0.size, self.nsp))
+        Xs1 = zeros(Xs0.shape)
+
+        recode = self.lib.satpt(p, T, Gc, ic, Xs0, self.nsp, self.nel, self.lewis, self.M, self.a, Xs1, verbose)
+        if recode!=0: raise Exception("Equilibrium Calc Failed.")
+        return Xs1
+
+
     def rhou(self, rho, u, Xs0, verbose=0):
         """ Call c library to compute equilibrium concentrations at fixed rho, u """
         if Xs0.size!=self.nsp: raise Exception('Mismatched array size {}!={}'.format(Xs0.size, self.nsp))

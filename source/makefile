@@ -1,10 +1,10 @@
 CC = gcc
-CFLAGS := -I. -fPIC -Wall -std=c99 -O3
+CFLAGS := -I. -fPIC -Wall -std=c99 -O0
 INSTALL_DIR ?= $(HOME)/eqcinst
 
-all: thermo.o linalg.o common.o pt.o rhou.o ps.o rhot.o eqc.o
-	$(CC) $(CFLAGS) -shared thermo.o linalg.o common.o pt.o rhou.o ps.o rhot.o eqc.o -lm -o libeqc.so
-	ar r libeqc.a thermo.o linalg.o common.o pt.o rhou.o ps.o rhot.o eqc.o
+all: thermo.o linalg.o common.o satpt.o pt.o rhou.o ps.o rhot.o eqc.o
+	$(CC) $(CFLAGS) -shared thermo.o linalg.o common.o satpt.o pt.o rhou.o ps.o rhot.o eqc.o -lm -o libeqc.so
+	ar r libeqc.a thermo.o linalg.o common.o satpt.o pt.o rhou.o ps.o rhot.o eqc.o
 	ranlib libeqc.a
 
 thermo.o: thermo.c thermo.h
@@ -15,6 +15,9 @@ linalg.o: linalg.c linalg.h
 
 common.o: common.c common.h
 	$(CC) $(CFLAGS) -c common.c
+
+satpt.o: satpt.c thermo.h linalg.h common.h satpt.h
+	$(CC) $(CFLAGS) -c satpt.c
 
 pt.o: pt.c thermo.h linalg.h common.h pt.h
 	$(CC) $(CFLAGS) -c pt.c
