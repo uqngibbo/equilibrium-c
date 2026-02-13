@@ -54,10 +54,8 @@ static void Assemble_Matrices(double* a, double* bi0, double* G0_RTs, double p, 
             akjnjmuj += a[k*nsp+j]*ns[j]*mus_RTj;
 
         }
-        // Add unknown bc0 term if this k is the unknown elemental
-        // constituent.  WIP 04/02/26
+        // Add unknown bc0 term if this k is the unknown elemental constituent
         if (k==ic) {
-            //A[k*neq + nel+1] += bi0[ic]; // Did this on thursday but it's wrong
             A[k*neq + nel+1] = -bi0[ic];
         } else {
             A[k*neq + nel+1] = 0.0; // Need to zero the extra matrix column
@@ -244,10 +242,14 @@ static void update_unknowns(double* S,double* dlnns,int nsp,int nel,int ic,doubl
         S     : vector of corrections from matrix step [nel+2]
         dlnns : vector of species mole/mixture corrections [nsp]
         nsp   : number of species
+        nsp   : number of elements
+        ic    : index of unknown saturating element
     Outputs:
         ns    : vector of species mole/mixtures [nsp]
         lnns  : natural log of the species moles/mixture kg [nsp]
         n     : pointer to total moles/mixture (passed by reference!) [1]
+        b0    : pointer to bi0 constraint vector [nel]
+        lnb   : log(bi0[ic]), the log of the unknown saturating quantity
     */
     int s;
     double newlnns,lnn,n_copy,lambda,newns,rdlnns,lnbcopy,newlnb;
@@ -289,6 +291,8 @@ int solve_satpt(double p,double T,double Gc,int ic,double* X0,int nsp,int nel,do
     Inputs:
         p     : Pressure (Pa)
         T     : Temperature (K)
+        Gc    : Gibbs energy of saturating condensed species
+        ic    : index of saturating element
         X0    : Intial Mole fractions [nsp]
         nsp   : number of species 
         nel   : number of elements 
@@ -329,10 +333,6 @@ int solve_satpt(double p,double T,double Gc,int ic,double* X0,int nsp,int nel,do
         lp = lewis + 9*3*s;
         G0_RTs[s] = compute_G0_RT(T, lp);
     }
-
-    //printf("initial bi0: [");
-    //for (i=0; i<nel; i++) printf("%e, ", bi0[i]);
-    //printf("]\n");
 
     // Main Iteration Loop: 
     for (k=0; k<=attempts; k++){
