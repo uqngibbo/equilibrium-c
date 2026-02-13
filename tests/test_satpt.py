@@ -6,7 +6,6 @@ Test the saturated pt capability by computing Bprime at an ablating surface.
 
 import unittest
 from numpy import array, linspace, zeros
-import matplotlib.pyplot as plt
 from numpy.testing import assert_array_almost_equal
 import eqc
 
