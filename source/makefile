@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS := -I. -fPIC -Wall -std=c99 -O0
+CFLAGS := -I. -fPIC -Wall -std=c99 -O3
 INSTALL_DIR ?= $(HOME)/eqcinst
 
 all: thermo.o linalg.o common.o satpt.o pt.o rhou.o ps.o rhot.o eqc.o
